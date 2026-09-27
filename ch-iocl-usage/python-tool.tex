@@ -1,271 +1,365 @@
 \section{Automatically Transforming Applications}
 
+
+
 % \section{Pseudocode}
+
 % \label{sec:pseudo}
+
 The pseudocode for \ect{} and \elin{} clients is shown in \cref{ellis-ct-clientprotocol} and \cref{ellis-lin-clientprotocol}. 
+
 The pseudocode for \ect{} and \elin{} shard leaders is shown in \cref{ellis-ct-leaderprotocol} ??% and \cref{}. 
+
 The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-recover} and ??%\cref{}.
 
-\SetKw{State}{state}
-\SetKw{Send}{send}
-\SetKw{Wait}{wait}
-\SetKw{Call}{call}
-\SetKw{Return}{return}
-\SetKw{Continue}{continue}
 
-\SetKwComment{Comment}{//}{}
 
-\SetKwProg{Function}{function}{}{end}
 
-\SetKwBlock{parallelblk}{Do In Parallel}{end}
-\SetKwBlock{atomicblk}{atomic}{end}
 
-\SetKwFunction{atomicAdd}{AtomicAdd}
-\SetKwFunction{sortps}{sortByLamportEpoch}
-\SetKwFunction{executeRetClie}{executeAndSubmitOpReply}
-\SetKwFunction{clientSubmit}{Client::SendRequest}
-\SetKwFunction{leaderHandleAccept}{Leader::AcceptRespRecv}
-\SetKwFunction{leaderHandleFinalAccept}{Leader::FinalAcceptRespRecv}
-\SetKwFunction{clientWait}{Client::AwaitRequest}
-\SetKwFunction{Recover}{NewLeader::Recover}
-\SetKwFunction{getPredecessor}{Leader::GetPredecessorTS}
-\SetKwFunction{getSuccessor}{Leader::GetSuccessorTS}
-\SetKwFunction{getChain}{Leader::GetTimestampChain}
-\SetKwFunction{leaderSubmit}{Leader::SubmitRequestRecv}
-\SetKwFunction{clientToLeader}{SubmitRequest}
-\SetKwFunction{leaderSubmitCR}{Leader::SubmitCoordinationRecv}
-\SetKwFunction{clientToLeaderCR}{SubmitCoordination}
-\SetKwFunction{leaderHandleArrivalAcks}{Leader::SubmitArrivalTSRecv}
-\SetKwFunction{leaderHandleAssignedAcks}{Leader::SubmitAssignedTSRecv}
-\SetKwFunction{leaderCommitAndExecute}{Leader::CommitAndExecute}
-\SetKwFunction{replicaCoord}{Replica::coordRequestRecv}
-\SetKwFunction{shardMain}{Leader::ProcessEpoch}
-\SetKwFunction{leaderCoordResp}{Leader::CoordRespRecv}
-\SetKwFunction{leaderFinalCoordResp}{Leader::FinalCoordRespRecv}
-\SetKwFunction{CRReply}{Leader::SubmitCRRespRecv}
-\SetKwFunction{CRAckReply}{Leader::SubmitCRAckRespRecv}
-\SetKwFunction{append}{.append}
-\SetKwFunction{find}{.find}
-\SetKwFunction{pop}{.pop}
-\SetKwFunction{adds}{.add}
-\SetKwFunction{removes}{.remove}
-\SetKwFunction{insertSorted}{.insertSorted}
-\SetKwFunction{qpush}{.enq}
-\SetKwFunction{qpop}{.deq}
-\SetKwFunction{qpeak}{.peak}
-\SetKwFunction{sorting}{.sort}
-\SetKwFunction{createntry}{createEntry}
-\SetKwFunction{clearing}{.clear}
-\SetKwFunction{constructQueue}{constructQueue}
-\SetKwFunction{constructMap}{constructMap}
-\SetKwFunction{execute}{execute}
-\SetKwFunction{foldl}{FoldL}
-\SetKwFunction{resort}{resort}
-\SetKwFunction{Accept}{Accept}
-\SetKwFunction{coordresp}{CoordResp}
-\SetKwFunction{FinalAccept}{FinalAccept}
-\SetKwFunction{requestreply}{RequestReply}
-\SetKwFunction{commit}{Commit}
 
-\algnewcommand{\IfThenElse}[3]{% \IfThenElse{<if>}{<then>}{<else>}
-  \algorithmicif\ #1\ \algorithmicthen\ #2\ \algorithmicelse\ #3}
 
-\algnewcommand{\IfThen}[2]{% \IfThenElse{<if>}{<then>}{<else>}
-  \algorithmicif\ #1\ \algorithmicthen\ #2}
+
+\providecommand{\atomicAdd}{\textsc{AtomicAdd}}
+
+\providecommand{\sortps}{\textsc{sortByLamportEpoch}}
+
+\providecommand{\executeRetClie}{\textsc{executeAndSubmitOpReply}}
+
+\providecommand{\clientSubmit}{\textsc{Client::SendRequest}}
+
+\providecommand{\leaderHandleAccept}{\textsc{Leader::AcceptRespRecv}}
+
+\providecommand{\leaderHandleFinalAccept}{\textsc{Leader::FinalAcceptRespRecv}}
+
+\providecommand{\clientWait}{\textsc{Client::AwaitRequest}}
+
+\providecommand{\Recover}{\textsc{NewLeader::Recover}}
+
+\providecommand{\getPredecessor}{\textsc{Leader::GetPredecessorTS}}
+
+\providecommand{\getSuccessor}{\textsc{Leader::GetSuccessorTS}}
+
+\providecommand{\getChain}{\textsc{Leader::GetTimestampChain}}
+
+\providecommand{\leaderSubmit}{\textsc{Leader::SubmitRequestRecv}}
+
+\providecommand{\clientToLeader}{\textsc{SubmitRequest}}
+
+\providecommand{\leaderSubmitCR}{\textsc{Leader::SubmitCoordinationRecv}}
+
+\providecommand{\clientToLeaderCR}{\textsc{SubmitCoordination}}
+
+\providecommand{\leaderHandleArrivalAcks}{\textsc{Leader::SubmitArrivalTSRecv}}
+
+\providecommand{\leaderHandleAssignedAcks}{\textsc{Leader::SubmitAssignedTSRecv}}
+
+\providecommand{\leaderCommitAndExecute}{\textsc{Leader::CommitAndExecute}}
+
+\providecommand{\replicaCoord}{\textsc{Replica::coordRequestRecv}}
+
+\providecommand{\shardMain}{\textsc{Leader::ProcessEpoch}}
+
+\providecommand{\leaderCoordResp}{\textsc{Leader::CoordRespRecv}}
+
+\providecommand{\leaderFinalCoordResp}{\textsc{Leader::FinalCoordRespRecv}}
+
+\providecommand{\CRReply}{\textsc{Leader::SubmitCRRespRecv}}
+
+\providecommand{\CRAckReply}{\textsc{Leader::SubmitCRAckRespRecv}}
+
+\providecommand{\append}{\textsc{.append}}
+
+\providecommand{\find}{\textsc{.find}}
+
+\providecommand{\pop}{\textsc{.pop}}
+
+\providecommand{\adds}{\textsc{.add}}
+
+\providecommand{\removes}{\textsc{.remove}}
+
+\providecommand{\insertSorted}{\textsc{.insertSorted}}
+
+\providecommand{\qpush}{\textsc{.enq}}
+
+\providecommand{\qpop}{\textsc{.deq}}
+
+\providecommand{\qpeak}{\textsc{.peak}}
+
+\providecommand{\sorting}{\textsc{.sort}}
+
+\providecommand{\createntry}{\textsc{createEntry}}
+
+\providecommand{\clearing}{\textsc{.clear}}
+
+\providecommand{\constructQueue}{\textsc{constructQueue}}
+
+\providecommand{\constructMap}{\textsc{constructMap}}
+
+\providecommand{\execute}{\textsc{execute}}
+
+\providecommand{\foldl}{\textsc{FoldL}}
+
+\providecommand{\resort}{\textsc{resort}}
+
+\providecommand{\Accept}{\textsc{Accept}}
+
+\providecommand{\coordresp}{\textsc{CoordResp}}
+
+\providecommand{\FinalAccept}{\textsc{FinalAccept}}
+
+\providecommand{\requestreply}{\textsc{RequestReply}}
+
+\providecommand{\commit}{\textsc{Commit}}
+
+
+
+
+
+
+
+
+
+
 
 % \section{Protocol Algorithms}
+
 % \label{sec:algorithms}
 
 
+
+
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % %%%%%%%%% Ellis_Linear Client %%%%%%%%%%%%%%%%
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \begin{algorithm}[!tb]
-    \State $\mathcal{L} \gets \{...\}$ \algorithmiccomment{Shard Leaders}\\
-    \State $\textit{c} \gets$ unique client ID\\
-    \State $\sigma[\cdot] \gets 0$ \algorithmiccomment{Per-shard counters}\\
-    \State $\textit{P} \gets \textit{NULL}$\\
-    \State $n_P \gets 0$ \algorithmiccomment{Count of outstanding requests}\\
-    \State $R : (\mathsf{Rid}\times\mathsf{Shard}) \rightharpoonup \mathsf{value};\quad R \gets \emptyset$ \algorithmiccomment{Cached request results}\\
-    \Function{\clientSubmit(\textit{Op}, K, V)}{
-        $\ell_i \in \mathcal{L} \gets shard\_leader(K)$\\
-        $r \gets (c \ll 32) + \sigma[i]$ \algorithmiccomment{Unique request ID}\\
-        $\sigma[i] \mathrel{+}= 1$\\
-        \If{$\textit{P} \neq \textit{NULL}$}{
-            $\textit{$(r', \ell_{i'})$} \gets \textit{P}$ \algorithmiccomment{Predecessor}\\
-            $m \gets (r', r, \ell_i)$\\
-            \Send $\clientToLeaderCR(m)$ to $\ell_{i'} \in \mathcal{L}$\\
-        }
-        $\textit{m} \gets (\textit{Op}, K, V, \textit{r}, \textit{P})$\\
-        \Send $\clientToLeader(m)$ to $\ell_{i} \in \mathcal{L}$\\
-        $\textit{P} \gets (r, \ell_i)$\\
-        $n_P \mathrel{+}=1$\\
-        \Return (r, $\ell_i$) \algorithmiccomment{Return handle}\\
-    }
-    \Function{\clientWait(r, $\ell_i$)}{
-        \If{$(r, \ell_i) \in \mathrm{dom}(R)$} {
-            \Return $R(r,\ell_i)$\\
-        }
-        \While{\textbf{true}}{
-            \Wait receive $RequestReply(m', v)$\\
-            $n_P \mathrel{-}= 1$\\
-            \If{$n_P = 0$} {
-                    $P \gets NULL$\algorithmiccomment{Remove dependency}\\
-            }
-            \If{$(m'.r, m'.\ell_i) = (r, \ell_i)$} {
-                \Return $v$\\
-            }
-            \Else{
-                $R \gets R \cup \{(m'.r, m'.\ell_i) \mapsto v\}$ \algorithmiccomment{Cache result}\\
-            }
-        }
-    }
-    \caption{Ellis\_Linear Client}
-    \label{ellis-lin-clientprotocol}
+  \caption{Ellis\_Linear Client}
+  \label{ellis-lin-clientprotocol}
+  \begin{algorithmic}[1]
+    \State $\mathcal{L} \gets \{...\}$ \Comment{Shard Leaders}
+    \State $\textit{c} \gets$ unique client ID
+    \State $\sigma[\cdot] \gets 0$ \Comment{Per-shard counters}
+    \State $\textit{P} \gets \textit{NULL}$
+    \State $n_P \gets 0$ \Comment{Count of outstanding requests}
+    \State $R : (\mathsf{Rid}\times\mathsf{Shard}) \rightharpoonup \mathsf{value};\quad R \gets \emptyset$ \Comment{Cached request results}
+    \Procedure{\clientSubmit}{\textit{*Op*}, K, V}
+      \State $\ell_i \in \mathcal{L} \gets shard\_leader(K)$
+      \State $r \gets (c \ll 32) + \sigma[i]$ \Comment{Unique request ID}
+      \State $\sigma[i] \mathrel{+}= 1$
+      \If{$\textit{P} \neq \textit{NULL}$}
+        \State $(r', \ell_{i'}) \gets P$ \Comment{Predecessor}
+        \State $m \gets (r', r, \ell_i)$
+        \State \textbf{send} $\clientToLeaderCR(m)$ to $\ell_{i'} \in \mathcal{L}$
+        \EndIf
+      \State $\textit{m} \gets (\textit{Op}, K, V, \textit{r}, \textit{P})$
+      \State \textbf{send} $\clientToLeader(m)$ to $\ell_{i} \in \mathcal{L}$
+      \State $\textit{P} \gets (r, \ell_i)$
+      \State $n_P \mathrel{+}=1$
+      \State \textbf{return} (r, $\ell_i$) \Comment{Return handle}
+      \EndProcedure
+    \Procedure{\clientWait}{r, $\ell_i$}
+      \If{$(r, \ell_i) \in \mathrm{dom}(R)$}
+        \State \textbf{return} $R(r,\ell_i)$
+        \EndIf
+      \While{\textbf{true}}
+        \State \textbf{wait} receive $RequestReply(m', v)$
+        \State $n_P \mathrel{-}= 1$
+        \If{$n_P = 0$}
+          \State $P \gets NULL$\Comment{Remove dependency}
+          \EndIf
+        \If{$(m'.r, m'.\ell_i) = (r, \ell_i)$}
+          \State \textbf{return} $v$
+          \Else
+          \State $R \gets R \cup \{(m'.r, m'.\ell_i) \mapsto v\}$ \Comment{Cache result}
+          \EndIf
+        \EndWhile
+      \EndProcedure
+  \end{algorithmic}
 \end{algorithm}
 
 
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %%%%% Ellis Linear Leader %%%%%%%
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{algorithm}[!tb]
-    \State $\mathcal{L} \gets \{...\}$ \algorithmiccomment{Shard Leaders}\\
-    \State $\mathcal{R}$ \algorithmiccomment{Set of all replicas in shard}\\
-    \State $ShardTS \gets 0$\\
-    \Function{\leaderSubmit(\textit{Op}, K, V, P, s, pred)}{
-        $entry := \createntry(\textit{Op}, K, V, P, s, pred)$\\
-        \If{$entry.\mathrm{pred} = NULL$}{
-            $entry.\mathrm{ts\_chain} = []$\\
-            $my\_ts = ShardTS$\\
-            $Shard\_TS = my\_ts + 1$\\
-            $entry.\mathrm{ts\_chain}\append(my\_ts)$\\
-            $entry.\mathrm{committed} = False$\\
-            $\textit{orderedLog}\append(\textit{entry})$\\
-            \Send $\textit{FinalAccept}(\textit{entry})$ to all $r \in \mathcal{R}$\\
-        }
-        \Else{
-            $\textit{bufferedMap}\append(entry)$\\
-            \Send $\textit{Accept}(entry)$ to all $r \in \mathcal{R}$\\
-        }
-        % \If{$ClientSeqnoMap[P] \neq s$}{
-        %     $buffer_{P}(\{Op, K, V, P, s\})$\\
-        %     \algorithmiccomment{Buffer per-client out of order requests}\\
-        %     \Return\\
-        % }
-        % \algorithmiccomment{Issue this op}\\
-        % $\textit{bufferedMap}\append(\textit{Op}, K, V, P, s, 0)$\\
-        % $ClientSeqnoMap[P]\mathrel{+}=1$\\
-        % \Send $\textit{Accept}(\textit{Op}, K, V, P, s)$ to all $r \in \mathcal{R}$\\
-        % \For{$(Op, K, V, P, s) \in buffer_{P}$}{
-        % \algorithmiccomment{Issue OoO buffered ops that are now ready}\\
-        %     \If{$ClientSeqnoMap[P] = s$}{
-        %         $bufferedMap\append{(Op, K, V, P, s, 0)}$\\
-        %         $ClientSeqnoMap[P]\mathrel{+}=1$\\
-        %         \Send $Accept(Op, K, V, P, s)$ to all $r \in \mathcal{R}$\\
-        %     }
-        % }
-    }
-    \Function{\leaderHandleAccept(\text{entry})}{
-        $entry.\mathrm{acks}\mathrel{+}=1$\\
-        \If{$entry.\mathrm{acks} \ge |Q|$} {
-             $entry.\mathrm{committed} \gets \textit{True}$\\
-        }
-        \If{$entry.\mathrm{committed} \land entry.\mathrm{coordinated}$}{
-            $v \gets entry.\mathrm{execute}$\\
-            \If{$v \neq True \land entry.\mathrm{succrq} \neq NULL$}{
-                $\textit{SubmitCRResp}(entry.\mathrm{succrq}, False, NULL)$ to $L_{succrq} \in \mathcal{L}$\\
-                \Return
-            }
-            % \If{$timestamp\_chain \neq NULL$}{
-                \label{ts_assignment_pt1}
-                $pred\_ts = timestamp\_chain[-1]$\\
-                $\textit{my\_ts} = \max(\textit{pred\_ts}+1, \textit{ShardTS})$\\
-                $entry.\mathrm{ts\_chain}\append(my\_ts)$\\
-                \label{ts_assignment_pt2}
-                $\textit{ShardTS} = \textit{my\_ts}+1$\\
-            % }
-            % \Else{
-            %     $entry.ts\_chain = NULL$\\
-            % }
-            \If{$entry.\mathrm{succrq} \neq NULL$}{
-                $\textit{SubmitCRResp}(entry.\mathrm{succrq}, True, entry.\mathrm{ts\_chain})$ to $L_{succrq} \in \mathcal{L}$\\
-            }
-            $\textit{bufferedMap}\pop(\textit{entry})$\\
-            $\textit{orderedLog}\append(\textit{entry})$\\
-            \Send $\textit{FinalAccept}(\textit{entry})$ to all $r \in \mathcal{R}$\\             
-        }
-    }
-    \Function{\leaderHandleFinalAccept(\text{entry})}{
-        $entry.\mathrm{facks}\mathrel{+}=1$\\
-        \If{$entry.\mathrm{facks} \ge |Q|$}{
-            $entry.\mathrm{committed} = True$\\
-            \Send $\textit{Commit}(\textit{entry})$ to all $r \in \mathcal{R}$\\
-            $v := \execute{entry}$\\
-            $\textit{SubmitOpReply}(\textit{entry}, v)$ to $\textit{client}$\\
-        }
-    }   
-    \caption{Ellis\_Linear Leader}
-    \label{ellis-lin-leaderprotocol}
-\end{algorithm}
 
 \begin{algorithm}[!tb]
-    \Function{\leaderSubmitCR(\textit{pred}, \textit{req})}{
-    \algorithmiccomment{CR sent by client of req to shard carrying req's predecessor}\\
-        $pred.\mathrm{succrq} := \textit{req}$\\
-        \If{$\textit{entry} := \textit{orderedLog}\find(\textit{pred}) \neq \textit{NULL}$}{
-            \Wait $entry.\mathrm{committed}$\\
-            $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{execute}, entry.\mathrm{ts\_chain})$ to $L_{req} \in \mathcal{L}$\\
-            \Return\\
-        }
-        \Wait $\textit{entry} := \textit{bufferedMap}\find(\textit{pred}) \neq \textit{NULL}$\\
-        \Wait $(entry.\mathrm{committed} \land entry.\mathrm{coordinated}) \lor (\textit{bufferedMap}\find(\textit{pred}) = \textit{NULL})$\\
-         $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{execute}, entry.\mathrm{ts\_chain})$ to $L_{req} \in \mathcal{L}$\\
-        % \If{$\textit{entry.committed} \land \textit{entry.coordinated}$}{
-        %     $\textit{SubmitCRResp}(\textit{req}, \textit{True}, \textit{entry.ts\_chain})$ to $L_{req} \in \mathcal{L}$\\
-        % }
-        % \Else{
-        %     $\textit{SubmitCRResp}(req, \textit{False}, NULL)$ to $L_{req} \in \mathcal{L}$\\
-        % }        
-    }
-    \Function{\CRReply(\textit{req}, \textit{v}, \textit{timestamp\_chain})}{
-        \Wait $entry := bufferedMap\find{req} \neq NULL$\\
-        $entry.\mathrm{execute} \gets \textit{v}$\\
-        $entry.\mathrm{ts\_chain} = timestamp\_chain$\\
-        $entry.\mathrm{coordinated} \gets \textit{True}$\\
-        \If{$entry.\mathrm{committed} \land entry.\mathrm{coordinated}$}{
-            \If{$v \neq True \land entry.\mathrm{succrq} \neq NULL$}{
-                $\textit{SubmitCRResp}(entry.\mathrm{succrq}, False, NULL)$ to $L_{succrq} \in \mathcal{L}$\\
-                \Return
-            }
-            % \If{$timestamp\_chain \neq NULL$}{
-                \label{ts_assignment_pt1}
-                $pred\_ts = timestamp\_chain[-1]$\\
-                $\textit{my\_ts} = \max(\textit{pred\_ts}+1, \textit{ShardTS})$\\
-                $entry.\mathrm{ts\_chain}\append(my\_ts)$\\
-                \label{ts_assignment_pt2}
-                $\textit{ShardTS} = \textit{my\_ts}+1$\\
-            % }
-            % \Else{
-            %     $entry.ts\_chain = NULL$\\
-            % }
-            \If{$entry.\mathrm{succrq} \neq NULL$}{
-                $\textit{SubmitCRResp}(entry.\mathrm{succrq}, True, entry.\mathrm{ts\_chain})$ to $L_{succrq} \in \mathcal{L}$\\
-            }
-            $\textit{bufferedMap}\pop(\textit{entry})$\\
-            $\textit{orderedLog}\append(\textit{entry})$\\
-            \Send $\textit{FinalAccept}(\textit{entry})$ to all $r \in \mathcal{R}$\\            
-        }
-        % \Else{
-        %     $\textit{bufferedMap}\pop(\textit{entry})$\\
-        %     \If{$entry.succrq \neq NULL$}{
-        %         $\textit{SubmitCRResp}(\textit{entry.succrq}, \textit{False}, NULL)$ to $L_{succrq} \in \mathcal{L}$\\
-        %     }
-        % }
-    
-    }
-    \caption{Ellis\_Linear Leader Continued}
-    \label{ellis-lin-leaderprotocol-continued}
+  \caption{Ellis\_Linear Leader}
+  \label{ellis-lin-leaderprotocol}
+  \begin{algorithmic}[1]
+    \State $\mathcal{L} \gets \{...\}$ \Comment{Shard Leaders}
+    \State $\mathcal{R}$ \Comment{Set of all replicas in shard}
+    \State $ShardTS \gets 0$
+    \Procedure{\leaderSubmit}{\textit{*Op*}, K, V, P, s, pred}
+      \State $entry := \createntry(\textit{Op}, K, V, P, s, pred)$
+      \If{$entry.\mathrm{pred} = NULL$}
+        \State $entry.\mathrm{ts\_chain} = []$
+        \State $my\_ts = ShardTS$
+        \State $Shard\_TS = my\_ts + 1$
+        \State $entry.\mathrm{ts\_chain}\append(my\_ts)$
+        \State $entry.\mathrm{committed} = False$
+        \State $\textit{orderedLog}\append(\textit{entry})$
+        \State \textbf{send} $\textit{FinalAccept}(\textit{entry})$ to all $r \in \mathcal{R}$
+        \Else
+        \State $\textit{bufferedMap}\append(entry)$
+        \State \textbf{send} $\textit{Accept}(entry)$ to all $r \in \mathcal{R}$
+        \EndIf
+    % \If{$ClientSeqnoMap[P] \neq s$}{
+    %     $buffer\_{P}(\{Op, K, V, P, s\})$\\\\
+    %     \algorithmiccomment{Buffer per-client out of order requests}\\\\
+    %     \Return\\\\
+    % }
+    % \algorithmiccomment{Issue this op}\\\\
+    % $\textit{bufferedMap}\append(\textit{Op}, K, V, P, s, 0)$\\\\
+    % $ClientSeqnoMap[P]\mathrel{+}=1$\\\\
+    % \Send $\textit{Accept}(\textit{Op}, K, V, P, s)$ to all $r \in \mathcal{R}$\\\\
+    % \For{$(Op, K, V, P, s) \in buffer\_{P}$}{
+    % \algorithmiccomment{Issue OoO buffered ops that are now ready}\\\\
+    %     \If{$ClientSeqnoMap[P] = s$}{
+    %         $bufferedMap\append{(Op, K, V, P, s, 0)}$\\\\
+    %         $ClientSeqnoMap[P]\mathrel{+}=1$\\\\
+    %         \Send $Accept(Op, K, V, P, s)$ to all $r \in \mathcal{R}$\\\\
+    %     }
+    % }
+      \EndProcedure
+    \Procedure{\leaderHandleAccept}{\text{entry}}
+      \State $entry.\mathrm{acks}\mathrel{+}=1$
+      \If{$entry.\mathrm{acks} \ge |Q|$}
+        \State $entry.\mathrm{committed} \gets \textit{True}$
+        \EndIf
+      \If{$entry.\mathrm{committed} \land entry.\mathrm{coordinated}$}
+        \State $v \gets entry.\mathrm{execute}$
+        \If{$v \neq True \land entry.\mathrm{succrq} \neq NULL$}
+          \State $\textit{SubmitCRResp}(entry.\mathrm{succrq}, False, NULL)$ to $L\_{succrq} \in \mathcal{L}$
+          \State \textbf{return}
+          \EndIf
+    % \If{$timestamp\_chain \neq NULL$}{
+        \label{ts_assignment_pt1}
+        \State $pred\_ts = timestamp\_chain[-1]$
+        \State $\textit{my\_ts} = \max(\textit{pred\_ts}+1, \textit{ShardTS})$
+        \State $entry.\mathrm{ts\_chain}\append(my\_ts)$
+        \label{ts_assignment_pt2}
+        \State $\textit{ShardTS} = \textit{my\_ts}+1$
+    % }
+    % \Else{
+    %     $entry.ts\_chain = NULL$\\\\
+    % }
+        \If{$entry.\mathrm{succrq} \neq NULL$}
+          \State $\textit{SubmitCRResp}(entry.\mathrm{succrq}, True, entry.\mathrm{ts\_chain})$ to $L\_{succrq} \in \mathcal{L}$
+          \EndIf
+        \State $\textit{bufferedMap}\pop(\textit{entry})$
+        \State $\textit{orderedLog}\append(\textit{entry})$
+        \State \textbf{send} $\textit{FinalAccept}(\textit{entry})$ to all $r \in \mathcal{R}$
+        \EndIf
+      \EndProcedure
+    \Procedure{\leaderHandleFinalAccept}{\text{entry}}
+      \State $entry.\mathrm{facks}\mathrel{+}=1$
+      \If{$entry.\mathrm{facks} \ge |Q|$}
+        \State $entry.\mathrm{committed} = True$
+        \State \textbf{send} $\textit{Commit}(\textit{entry})$ to all $r \in \mathcal{R}$
+        \State $v := \execute{entry}$
+        \State $\textit{SubmitOpReply}(\textit{entry}, v)$ to $\textit{client}$
+        \EndIf
+      \EndProcedure
+  \end{algorithmic}
 \end{algorithm}
+
+
+
+\begin{algorithm}[!tb]
+  \caption{Ellis\_Linear Leader Continued}
+  \label{ellis-lin-leaderprotocol-continued}
+  \begin{algorithmic}[1]
+    \Procedure{\leaderSubmitCR}{\textit{*pred*}, \textit{*req*}}
+      \Statex \Comment{CR sent by client of req to shard carrying req's predecessor}
+      \State $pred.\mathrm{succrq} := \textit{req}$
+      \If{$\textit{entry} := \textit{orderedLog}\find(\textit{pred}) \neq \textit{NULL}$}
+        \State \textbf{wait} $entry.\mathrm{committed}$
+        \State $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{execute}, entry.\mathrm{ts\_chain})$ to $L\_{req} \in \mathcal{L}$
+        \State \textbf{return}
+        \EndIf
+      \State \textbf{wait} $\textit{entry} := \textit{bufferedMap}\find(\textit{pred}) \neq \textit{NULL}$
+      \State \textbf{wait} $(entry.\mathrm{committed} \land entry.\mathrm{coordinated}) \lor (\textit{bufferedMap}\find(\textit{pred}) = \textit{NULL})$
+      \State $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{execute}, entry.\mathrm{ts\_chain})$ to $L\_{req} \in \mathcal{L}$
+    % \If{$\textit{entry.committed} \land \textit{entry.coordinated}$}{
+    %     $\textit{SubmitCRResp}(\textit{req}, \textit{True}, \textit{entry.ts\_chain})$ to $L\_{req} \in \mathcal{L}$\\\\
+    % }
+    % \Else{
+    %     $\textit{SubmitCRResp}(req, \textit{False}, NULL)$ to $L\_{req} \in \mathcal{L}$\\\\
+    % }
+      \EndProcedure
+    \Procedure{\CRReply}{\textit{*req*}, \textit{*v*}, \textit{*timestamp\_chain*}}
+      \State \textbf{wait} $entry := bufferedMap\find{req} \neq NULL$
+      \State $entry.\mathrm{execute} \gets \textit{v}$
+      \State $entry.\mathrm{ts\_chain} = timestamp\_chain$
+      \State $entry.\mathrm{coordinated} \gets \textit{True}$
+      \If{$entry.\mathrm{committed} \land entry.\mathrm{coordinated}$}
+        \If{$v \neq True \land entry.\mathrm{succrq} \neq NULL$}
+          \State $\textit{SubmitCRResp}(entry.\mathrm{succrq}, False, NULL)$ to $L\_{succrq} \in \mathcal{L}$
+          \State \textbf{return}
+          \EndIf
+    % \If{$timestamp\_chain \neq NULL$}{
+        \label{ts_assignment_pt1}
+        \State $pred\_ts = timestamp\_chain[-1]$
+        \State $\textit{my\_ts} = \max(\textit{pred\_ts}+1, \textit{ShardTS})$
+        \State $entry.\mathrm{ts\_chain}\append(my\_ts)$
+        \label{ts_assignment_pt2}
+        \State $\textit{ShardTS} = \textit{my\_ts}+1$
+    % }
+    % \Else{
+    %     $entry.ts\_chain = NULL$\\\\
+    % }
+        \If{$entry.\mathrm{succrq} \neq NULL$}
+          \State $\textit{SubmitCRResp}(entry.\mathrm{succrq}, True, entry.\mathrm{ts\_chain})$ to $L\_{succrq} \in \mathcal{L}$
+          \EndIf
+        \State $\textit{bufferedMap}\pop(\textit{entry})$
+        \State $\textit{orderedLog}\append(\textit{entry})$
+        \State \textbf{send} $\textit{FinalAccept}(\textit{entry})$ to all $r \in \mathcal{R}$
+        \EndIf
+    % \Else{
+    %     $\textit{bufferedMap}\pop(\textit{entry})$\\\\
+    %     \If{$entry.succrq \neq NULL$}{
+    %         $\textit{SubmitCRResp}(\textit{entry.succrq}, \textit{False}, NULL)$ to $L\_{succrq} \in \mathcal{L}$\\\\
+    %     }
+    % }
+      \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -294,446 +388,644 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %%%%%%%%% Ellis_CT Client %%%%%%%%%%%%%%%%
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \begin{algorithm}[!tb]
-    \State $\mathcal{L} \gets \{...\}$ \algorithmiccomment{Shard leaders}\\
-    \State $c \gets$ unique client ID\\
-    \State $\sigma[\cdot] \gets 0$ \algorithmiccomment{Per-shard counters}\\
-    \State $D : (\mathsf{Rid}\times\mathsf{Shard}) \rightharpoonup \mathbb{N};\quad D \gets \emptyset$ \algorithmiccomment{Outstanding dependencies}\\
-    \State $R : (\mathsf{Rid}\times\mathsf{Shard}) \rightharpoonup \mathsf{value};\quad R \gets \emptyset$ \algorithmiccomment{Cached request results}\\
-
-    \Function{\clientSubmit(\textit{Op}, K, V)}{
-        $\ell_i \in \mathcal{L} \gets shard\_leader(K)$\\
-        $r \gets (c \ll 32) + \sigma[i]$ \algorithmiccomment{Unique request ID}\\
-        $\sigma[i] \mathrel{+}= 1$\\
-        $P \gets \mathrm{dom}(D)$ \algorithmiccomment{Predecessors}\\
-        \For{$\mathrm{each}\ (r', \ell_{i'}) \in P$}{
-            $m \gets (r', r, \ell_i)$\\
-            \Send $\clientToLeaderCR(m)$ to $\ell_{i'} \in \mathcal{L}$\\
-        }
-        $m \gets (\textit{Op}, K, V, r, P)$\\
-        \Send $\clientToLeader(m)$ to $\ell_{i} \in \mathcal{L}$\\
-        $D(r, \ell_{i}) \gets 0$ \algorithmiccomment{Insert as future dependency}\\
-        $\forall x \in \mathrm{dom}(D):\ D(x) \mathrel{+}= 1$\\
-        \Return (r, $\ell_i$) \algorithmiccomment{Return handle}\\
-    }
-
-    \Function{\clientWait(r, $\ell_i$)}{
-        \If{$(r, \ell_i) \in \mathrm{dom}(R)$} {
-            \Return $R(r,\ell_i)$\\
-        }
-        \While{\textbf{true}}{
-            \Wait receive $RequestReply(m', v)$\\
-            \For{$\mathrm{each}\ (r', \ell_{i'}) \in m'.P$}{
-                $D(r', \ell_{i'}) \mathrel{-}= 1$\\
-                \If{$D(r', \ell_{i'}) = 0$} {
-                    $D \gets D \setminus \{(r', \ell_{i'})\}$\algorithmiccomment{Remove dependency}\\
-                }
-            }
-            \If{$(m'.r, m'.\ell_i) = (r, \ell_i)$} {
-                \Return $v$\\
-            }
-            \Else{
-                $R \gets R \cup \{(m'.r, m'.\ell_i) \mapsto v\}$ \algorithmiccomment{Cache result}\\
-            }
-        }
-    }
-
-    \caption{Ellis\_CT Client}
-    \label{ellis-ct-clientprotocol}
+  \caption{Ellis\_CT Client}
+  \label{ellis-ct-clientprotocol}
+  \begin{algorithmic}[1]
+    \State $\mathcal{L} \gets \{...\}$ \Comment{Shard leaders}
+    \State $c \gets$ unique client ID
+    \State $\sigma[\cdot] \gets 0$ \Comment{Per-shard counters}
+    \State $D : (\mathsf{Rid}\times\mathsf{Shard}) \rightharpoonup \mathbb{N};\quad D \gets \emptyset$ \Comment{Outstanding dependencies}
+    \State $R : (\mathsf{Rid}\times\mathsf{Shard}) \rightharpoonup \mathsf{value};\quad R \gets \emptyset$ \Comment{Cached request results}
+    \Procedure{\clientSubmit}{\textit{*Op*}, K, V}
+      \State $\ell_i \in \mathcal{L} \gets shard\_leader(K)$
+      \State $r \gets (c \ll 32) + \sigma[i]$ \Comment{Unique request ID}
+      \State $\sigma[i] \mathrel{+}= 1$
+      \State $P \gets \mathrm{dom}(D)$ \Comment{Predecessors}
+      \For{$\mathrm{each}\ (r', \ell_{i'}) \in P$}
+        \State $m \gets (r', r, \ell_i)$
+        \State \textbf{send} $\clientToLeaderCR(m)$ to $\ell_{i'} \in \mathcal{L}$
+        \EndFor
+      \State $m \gets (\textit{Op}, K, V, r, P)$
+      \State \textbf{send} $\clientToLeader(m)$ to $\ell_{i} \in \mathcal{L}$
+      \State $D(r, \ell_{i}) \gets 0$ \Comment{Insert as future dependency}
+      \State $\forall x \in \mathrm{dom}(D):\ D(x) \mathrel{+}= 1$
+      \State \textbf{return} (r, $\ell_i$) \Comment{Return handle}
+      \EndProcedure
+    \Procedure{\clientWait}{r, $\ell_i$}
+      \If{$(r, \ell_i) \in \mathrm{dom}(R)$}
+        \State \textbf{return} $R(r,\ell_i)$
+        \EndIf
+      \While{\textbf{true}}
+        \State \textbf{wait} receive $RequestReply(m', v)$
+        \For{$\mathrm{each}\ (r', \ell_{i'}) \in m'.P$}
+          \State $D(r', \ell_{i'}) \mathrel{-}= 1$
+          \If{$D(r', \ell_{i'}) = 0$}
+            \State $D \gets D \setminus \{(r', \ell_{i'})\}$\Comment{Remove dependency}
+            \EndIf
+          \EndFor
+        \If{$(m'.r, m'.\ell_i) = (r, \ell_i)$}
+          \State \textbf{return} $v$
+          \Else
+          \State $R \gets R \cup \{(m'.r, m'.\ell_i) \mapsto v\}$ \Comment{Cache result}
+          \EndIf
+        \EndWhile
+      \EndProcedure
+  \end{algorithmic}
 \end{algorithm}
 
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %%%%%% Ellis_CT Leader %%%%%%%%%%%%%
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{algorithm}[!tb]
-    \State $\mathcal{R}$ \algorithmiccomment{Shard replicas}\\
-    \State $ShardTS \gets 0$\\
-    \State $\textit{unorderedBag} \gets \emptyset$\\
-    \State $\textit{orderedLog} \gets []$\\
-    \Function{\leaderSubmit(Op, K, V, r, P)}{
-        $entry := \createntry(Op, K, V, r, P)$\\
-        $\textit{unorderedBag}\append(entry)$\\
-        \Send $\Accept(entry)$ to all $r \in \mathcal{R}$ \algorithmiccomment{Unordered replication}\\
-    }
-    \Function{\leaderHandleAccept(\textit{entry})}{
-        $entry.\mathrm{acks} \mathrel{+}= 1$\\
-        \If{$entry.\mathrm{acks} \ge |Q|$}{
-            $entry.\mathrm{committed} \gets True$\\
-            $entry.\mathrm{arrival\_TS} \gets ShardTS$; $ShardTS \gets ShardTS + 1$\\
-            $\textit{orderedLog}\insertSorted(entry)$\\
-            $entry.\mathrm{ready} \gets False$\\
-            \Send $\coordresp(entry.\mathrm{arrival\_TS})$ to all $\ell_i \in$ \textit{entry}.successors\\
-        }
-    }
-    \Function{\leaderSubmitCR(\textit{pred}, \textit{req})}{
-        $pred.\mathrm{succrq} := \textit{req}$\\
-        \If{$entry := \textit{orderedLog}\find(pred) \neq NULL$}{
-            \Send $\coordresp(entry.\mathrm{arrival\_TS})$ to $L_{req}$\\
-        }
-        \Else{
-            \Wait $entry := \textit{unorderedBag}\find(pred) \neq NULL$\\
-            \Wait $entry.\mathrm{committed}$\\
-            \Send $\coordresp(entry.\mathrm{arrival\_TS})$ to $L_{req}$\\
-        }
-    }
-    \Function{\leaderCoordResp(\textit{req}, \textit{pred\_arrivals})}{
-        \Wait $entry := \textit{orderedLog}\find(req) \neq NULL$\\
-        $entry.\mathrm{final\_TS} \gets \max(\foldl(pred\_arrivals), entry.\mathrm{arrival\_TS})$\\
-        $entry.\mathrm{ready} \gets True$\\
-        $ShardTS \gets entry.\mathrm{final\_TS} + 1$\\
-        \Send $\FinalAccept(entry)$ to all $r \in \mathcal{R}$\\
-    }
-    \Function{\leaderFinalCoordResp(req)}{
-        \Wait $tis$\\
-    }
-    \Function{\leaderHandleFinalAccept(\textit{entry})}{
-        $entry.\mathrm{facks} \mathrel{+}= 1$\\
-        \If{$entry.\mathrm{facks} \ge |Q|$}{
-            \Send $\commit(entry)$ to all $r \in \mathcal{R}$\\
-            $v := \execute(entry)$\\
-            \Send $\requestreply(entry, v)$ to $\textit{client}$\\
-        }
-    }
-    \caption{Ellis\_CT Leader}
-    \label{ellis-ct-leaderprotocol}
-\end{algorithm}
 
 \begin{algorithm}[!tb]
-    \State $\mathcal{L} \gets \{...\}$ \algorithmiccomment{Shard Leaders}\\
-    \State $\mathcal{R}$ \algorithmiccomment{Set of all replicas in shard}\\
-    \State $ShardTS \gets 0$\\
-    \State $last\_ready\_TS[k] \gets 0, \; \forall k$ \algorithmiccomment{Per-key counter}\\
-
-    \Function{\leaderSubmit(\textit{Op}, K, V, P, s, preds)}{
-        $entry := \createntry(\textit{Op}, K, V, P, s, preds)$\\
-        $entry.\mathrm{arrival\_ts} = ShardTS$\\
-        $ShardTS \gets ShardTS + 1$\\
-        $\textit{bufferedSet}\append(entry)$\\
-        \Send $\textit{Accept}(entry)$ to all $r \in \mathcal{R}$\\
-        \Send $\textit{ArrivalTS}(entry.\mathrm{arrival\_ts})$ to all successors in $\mathcal{L}$\\
-    }
-
-    \Function{\leaderHandleArrivalAcks(entry)}{
-        \algorithmiccomment{All predecessor arrival timestamps received}\\
-        \Wait $entry.\mathrm{pred\_arrival\_ts}[i] \neq \textit{NULL}$ for all $i \in entry.\mathrm{preds}$\\
-        $folded \gets \texttt{foldl}(entry.\mathrm{pred\_arrival\_ts})$\\
-        $entry.\mathrm{assigned\_ts} \gets \max(folded, last\_ready\_TS[entry.K] + 1)$\\
-        $\textit{orderedLog}\insertSorted(entry, key = entry.\mathrm{assigned\_ts})$\\
-        \Send $\textit{AssignedTS}(entry.\mathrm{assigned\_ts})$ to all successors in $\mathcal{L}$\\
-    }
-
-    \Function{\leaderHandleAssignedAcks(entry)}{
-        \algorithmiccomment{All predecessor assigned timestamps received (2nd round)}\\
-        \Wait $entry.\mathrm{pred\_assigned\_ts}[i] \neq \textit{NULL}$ for all $i \in entry.\mathrm{preds}$\\
-        $entry.\mathrm{final\_ts} \gets \texttt{foldl}(entry.\mathrm{pred\_assigned\_ts})$\\
-        $entry.\mathrm{ready} \gets \textit{True}$\\
-        $last\_ready\_TS[entry.K] \gets entry.\mathrm{final\_ts}$\\
-        $\textit{orderedLog}\resort(entry, sortkey = entry.\mathrm{final\_ts})$\\
-    }
-
-    \Function{\leaderCommitAndExecute(entry)}{
-        \algorithmiccomment{Commit when entry reaches head of log and is ready}\\
-        \Wait $\textit{orderedLog.head()} == entry \land entry.\mathrm{ready}$\\
-        \If{\textit{no unexecuted entry on same key precedes entry}}{
-            $v := \execute(entry)$\\
-            $\textit{SubmitOpReply}(entry, v)$ to $entry.\mathrm{client}$\\
-        }
-    }
-
-    \caption{Ellis\_CT Leader (CONTINUEEEEDD MERGE SECOND HALF)}
-    \label{alg:iocl_no_failures}
+  \caption{Ellis\_CT Leader}
+  \label{ellis-ct-leaderprotocol}
+  \begin{algorithmic}[1]
+    \State $\mathcal{R}$ \Comment{Shard replicas}
+    \State $ShardTS \gets 0$
+    \State $\textit{unorderedBag} \gets \emptyset$
+    \State $\textit{orderedLog} \gets []$
+    \Procedure{\leaderSubmit}{Op, K, V, r, P}
+      \State $entry := \createntry(Op, K, V, r, P)$
+      \State $\textit{unorderedBag}\append(entry)$
+      \State \textbf{send} $\Accept(entry)$ to all $r \in \mathcal{R}$ \Comment{Unordered replication}
+      \EndProcedure
+    \Procedure{\leaderHandleAccept}{\textit{*entry*}}
+      \State $entry.\mathrm{acks} \mathrel{+}= 1$
+      \If{$entry.\mathrm{acks} \ge |Q|$}
+        \State $entry.\mathrm{committed} \gets True$
+        \State $entry.\mathrm{arrival\_TS} \gets ShardTS$; $ShardTS \gets ShardTS + 1$
+        \State $\textit{orderedLog}\insertSorted(entry)$
+        \State $entry.\mathrm{ready} \gets False$
+        \State \textbf{send} $\coordresp(entry.\mathrm{arrival\_TS})$ to all $\ell_i \in$ \textit{*entry*}.successors
+        \EndIf
+      \EndProcedure
+    \Procedure{\leaderSubmitCR}{\textit{*pred*}, \textit{*req*}}
+      \State $pred.\mathrm{succrq} := \textit{req}$
+      \If{$entry := \textit{orderedLog}\find(pred) \neq NULL$}
+        \State \textbf{send} $\coordresp(entry.\mathrm{arrival\_TS})$ to $L\_{req}$
+        \Else
+        \State \textbf{wait} $entry := \textit{unorderedBag}\find(pred) \neq NULL$
+        \State \textbf{wait} $entry.\mathrm{committed}$
+        \State \textbf{send} $\coordresp(entry.\mathrm{arrival\_TS})$ to $L\_{req}$
+        \EndIf
+      \EndProcedure
+    \Procedure{\leaderCoordResp}{\textit{*req*}, \textit{*pred\_arrivals*}}
+      \State \textbf{wait} $entry := \textit{orderedLog}\find(req) \neq NULL$
+      \State $entry.\mathrm{final\_TS} \gets \max(\foldl(pred\_arrivals), entry.\mathrm{arrival\_TS})$
+      \State $entry.\mathrm{ready} \gets True$
+      \State $ShardTS \gets entry.\mathrm{final\_TS} + 1$
+      \State \textbf{send} $\FinalAccept(entry)$ to all $r \in \mathcal{R}$
+      \EndProcedure
+    \Procedure{\leaderFinalCoordResp}{req}
+      \State \textbf{wait} $tis$
+      \EndProcedure
+    \Procedure{\leaderHandleFinalAccept}{\textit{*entry*}}
+      \State $entry.\mathrm{facks} \mathrel{+}= 1$
+      \If{$entry.\mathrm{facks} \ge |Q|$}
+        \State \textbf{send} $\commit(entry)$ to all $r \in \mathcal{R}$
+        \State $v := \execute(entry)$
+        \State \textbf{send} $\requestreply(entry, v)$ to $\textit{client}$
+        \EndIf
+      \EndProcedure
+  \end{algorithmic}
 \end{algorithm}
 
 
 
 \begin{algorithm}[!tb]
-    \State $\mathcal{L} \gets \{...\}$ \algorithmiccomment{Shard Leaders}\\
-    \State $\mathcal{R}$ \algorithmiccomment{Replicas in shard}\\
-    \State $ShardTS \gets 0$\\
-    \State $last\_ready\_TS[k] \gets 0, \forall k$\\
-
-    \Function{\leaderSubmit(\textit{Op}, K, V, P, s, preds)}{
-        $entry := \createntry(\textit{Op}, K, V, P, s, preds)$\\
-        $entry.\mathrm{arrival\_ts} = ShardTS$\\
-        $ShardTS \gets ShardTS + 1$\\
-        $entry.\mathrm{status} \gets \textit{RESERVED}$\\
-        \algorithmiccomment{Replicate unordered Reservation before externalization}\\
-        \Send $\textit{Accept}(entry)$ to all $r \in \mathcal{R}$\\
-    }
-
-    \Function{\leaderHandleAccept(\textit{entry})}{
-        $entry.\mathrm{acks} \mathrel{+}=1$\\
-        \If{$entry.\mathrm{acks} \ge |Q|$}{
-            $entry.\mathrm{committed} \gets \textit{True}$\\
-            \Send $\textit{ArrivalTS}(entry.\mathrm{arrival\_ts})$ to all successors in $\mathcal{L}$\\
-        }
-    }
-
-    \Function{\leaderHandleArrivalAcks(entry)}{
-        \algorithmiccomment{All predecessor arrival timestamps received}\\
-        \Wait $entry.\mathrm{pred\_arrival\_ts}[i] \neq NULL$ for all $i \in entry.\mathrm{preds}$\\
-        $folded \gets \texttt{foldl}(entry.\mathrm{pred\_arrival\_ts})$\\
-        $entry.\mathrm{assigned\_ts} \gets \max(folded, last\_ready\_TS[entry.K]+1)$\\
-        \Send $\textit{AssignedTS}(entry.\mathrm{assigned\_ts})$ to all successors in $\mathcal{L}$\\
-    }
-
-    \Function{\leaderHandleAssignedAcks(entry)}{
-        \algorithmiccomment{All predecessor assigned timestamps received}\\
-        \Wait $entry.\mathrm{pred\_assigned\_ts}[i] \neq NULL$ for all $i \in entry.\mathrm{preds}$\\
-        $entry.\mathrm{final\_ts} \gets \texttt{foldl}(entry.\mathrm{pred\_assigned\_ts})$\\
-        $entry.\mathrm{ready} \gets \textit{True}$\\
-        $last\_ready\_TS[entry.K] \gets entry.\mathrm{final\_ts}$\\
-        \algorithmiccomment{Prepare Evidence set for final replication}\\
-        $entry.\mathrm{Evidence} \gets \{(entry.id, entry.assigned\_ts)\} \cup \{(p, assigned\_ts(p)) \mid p \in entry.preds\}$\\
-        $entry.\mathrm{status} \gets \textit{FINAL}$\\
-        $\textit{orderedLog}\insertSorted(entry, key = entry.\mathrm{final\_ts})$\\
-        \Send $\textit{Commit}(entry)$ to all $r \in \mathcal{R}$\\
-    }
-
-    \Function{\leaderCommitAndExecute(entry)}{
-        \algorithmiccomment{Replicas ack final commit}\\
-        \Wait $\textit{orderedLog.head()} == entry \land entry.\mathrm{ready}$\\
-        \If{\textit{no unexecuted entry on same key precedes entry}}{
-            $v := \execute(entry)$\\
-            $\textit{SubmitOpReply}(entry, v)$ to $entry.\mathrm{client}$\\
-        }
-    }
-
-    \caption{Ellis\_CT ALSO MERGE THIS PLEASE}
-    \label{alg:iocl_fail_tolerant}
+  \caption{Ellis\_CT Leader (CONTINUEEEEDD MERGE SECOND HALF)}
+  \label{alg:iocl_no_failures}
+  \begin{algorithmic}[1]
+    \State $\mathcal{L} \gets \{...\}$ \Comment{Shard Leaders}
+    \State $\mathcal{R}$ \Comment{Set of all replicas in shard}
+    \State $ShardTS \gets 0$
+    \State $last\_ready\_TS[k] \gets 0,\; \forall k$ \Comment{Per-key counter}
+    \Procedure{\leaderSubmit}{\textit{*Op*}, K, V, P, s, preds}
+      \State $entry := \createntry(\textit{Op}, K, V, P, s, preds)$
+      \State $entry.\mathrm{arrival\_ts} = ShardTS$
+      \State $ShardTS \gets ShardTS + 1$
+      \State $\textit{bufferedSet}\append(entry)$
+      \State \textbf{send} $\textit{Accept}(entry)$ to all $r \in \mathcal{R}$
+      \State \textbf{send} $\textit{ArrivalTS}(entry.\mathrm{arrival\_ts})$ to all successors in $\mathcal{L}$
+      \EndProcedure
+    \Procedure{\leaderHandleArrivalAcks}{entry}
+      \Statex \Comment{All predecessor arrival timestamps received}
+      \State \textbf{wait} $entry.\mathrm{pred\_arrival\_ts}[i] \neq \textit{NULL}$ for all $i \in entry.\mathrm{preds}$
+      \State $folded \gets \texttt{foldl}(entry.\mathrm{pred\_arrival\_ts})$
+      \State $entry.\mathrm{assigned\_ts} \gets \max(folded, last\_ready\_TS[entry.K] + 1)$
+      \State $\textit{orderedLog}\insertSorted(entry, key = entry.\mathrm{assigned\_ts})$
+      \State \textbf{send} $\textit{AssignedTS}(entry.\mathrm{assigned\_ts})$ to all successors in $\mathcal{L}$
+      \EndProcedure
+    \Procedure{\leaderHandleAssignedAcks}{entry}
+      \Statex \Comment{All predecessor assigned timestamps received (2nd round)}
+      \State \textbf{wait} $entry.\mathrm{pred\_assigned\_ts}[i] \neq \textit{NULL}$ for all $i \in entry.\mathrm{preds}$
+      \State $entry.\mathrm{final\_ts} \gets \texttt{foldl}(entry.\mathrm{pred\_assigned\_ts})$
+      \State $entry.\mathrm{ready} \gets \textit{True}$
+      \State $last\_ready\_TS[entry.K] \gets entry.\mathrm{final\_ts}$
+      \State $\textit{orderedLog}\resort(entry, sortkey = entry.\mathrm{final\_ts})$
+      \EndProcedure
+    \Procedure{\leaderCommitAndExecute}{entry}
+      \Statex \Comment{Commit when entry reaches head of log and is ready}
+      \State \textbf{wait} $\textit{orderedLog.head()} == entry \land entry.\mathrm{ready}$
+      \If{\textit{*no unexecuted entry on same key precedes entry*}}
+        \State $v := \execute(entry)$
+        \State $\textit{SubmitOpReply}(entry, v)$ to $entry.\mathrm{client}$
+        \EndIf
+      \EndProcedure
+  \end{algorithmic}
 \end{algorithm}
+
+
+
+
+
+
+
+\begin{algorithm}[!tb]
+  \caption{Ellis\_CT ALSO MERGE THIS PLEASE}
+  \label{alg:iocl_fail_tolerant}
+  \begin{algorithmic}[1]
+    \State $\mathcal{L} \gets \{...\}$ \Comment{Shard Leaders}
+    \State $\mathcal{R}$ \Comment{Replicas in shard}
+    \State $ShardTS \gets 0$
+    \State $last\_ready\_TS[k] \gets 0, \forall k$
+    \Procedure{\leaderSubmit}{\textit{*Op*}, K, V, P, s, preds}
+      \State $entry := \createntry(\textit{Op}, K, V, P, s, preds)$
+      \State $entry.\mathrm{arrival\_ts} = ShardTS$
+      \State $ShardTS \gets ShardTS + 1$
+      \State $entry.\mathrm{status} \gets \textit{RESERVED}$
+      \Statex \Comment{Replicate unordered Reservation before externalization}
+      \State \textbf{send} $\textit{Accept}(entry)$ to all $r \in \mathcal{R}$
+      \EndProcedure
+    \Procedure{\leaderHandleAccept}{\textit{*entry*}}
+      \State $entry.\mathrm{acks} \mathrel{+}=1$
+      \If{$entry.\mathrm{acks} \ge |Q|$}
+        \State $entry.\mathrm{committed} \gets \textit{True}$
+        \State \textbf{send} $\textit{ArrivalTS}(entry.\mathrm{arrival\_ts})$ to all successors in $\mathcal{L}$
+        \EndIf
+      \EndProcedure
+    \Procedure{\leaderHandleArrivalAcks}{entry}
+      \Statex \Comment{All predecessor arrival timestamps received}
+      \State \textbf{wait} $entry.\mathrm{pred\_arrival\_ts}[i] \neq NULL$ for all $i \in entry.\mathrm{preds}$
+      \State $folded \gets \texttt{foldl}(entry.\mathrm{pred\_arrival\_ts})$
+      \State $entry.\mathrm{assigned\_ts} \gets \max(folded, last\_ready\_TS[entry.K]+1)$
+      \State \textbf{send} $\textit{AssignedTS}(entry.\mathrm{assigned\_ts})$ to all successors in $\mathcal{L}$
+      \EndProcedure
+    \Procedure{\leaderHandleAssignedAcks}{entry}
+      \Statex \Comment{All predecessor assigned timestamps received}
+      \State \textbf{wait} $entry.\mathrm{pred\_assigned\_ts}[i] \neq NULL$ for all $i \in entry.\mathrm{preds}$
+      \State $entry.\mathrm{final\_ts} \gets \texttt{foldl}(entry.\mathrm{pred\_assigned\_ts})$
+      \State $entry.\mathrm{ready} \gets \textit{True}$
+      \State $last\_ready\_TS[entry.K] \gets entry.\mathrm{final\_ts}$
+      \Statex \Comment{Prepare Evidence set for final replication}
+      \State $entry.\mathrm{Evidence} \gets \{(entry.id, entry.assigned\_ts)\} \cup \{(p, assigned\_ts(p)) \mid p \in entry.preds\}$
+      \State $entry.\mathrm{status} \gets \textit{FINAL}$
+      \State $\textit{orderedLog}\insertSorted(entry, key = entry.\mathrm{final\_ts})$
+      \State \textbf{send} $\textit{Commit}(entry)$ to all $r \in \mathcal{R}$
+      \EndProcedure
+    \Procedure{\leaderCommitAndExecute}{entry}
+      \Statex \Comment{Replicas ack final commit}
+      \State \textbf{wait} $\textit{orderedLog.head()} == entry \land entry.\mathrm{ready}$
+      \If{\textit{*no unexecuted entry on same key precedes entry*}}
+        \State $v := \execute(entry)$
+        \State $\textit{SubmitOpReply}(entry, v)$ to $entry.\mathrm{client}$
+        \EndIf
+      \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+
+
 
 
 %%%%%%%%%%%% OPTIMIZATIONS????
+
 \begin{algorithm}[!tb]
-    \Function{\leaderSubmitCR(\textit{pred}, \textit{req})}{
-    \algorithmiccomment{CR sent by client of req to shard carrying req's predecessor}\\
-        $pred.\mathrm{succrq} := \textit{req}$\\
-        \If{$\textit{entry} := \textit{orderedLog}\find(\textit{pred}) \neq \textit{NULL}$}{
-            $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{seqno}, entry.\mathrm{my\_arrival\_ts}$ to $L_{req} \in \mathcal{L}$\\
-            \Return\\
-        }
-        \Wait $\textit{entry} := \textit{bufferedMap}\find(\textit{pred}) \neq \textit{NULL}$\\
-        \Wait $(entry.\mathrm{committed})$\\
-         $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{seqno}, entry.\mathrm{my\_arrival\_ts})$ to $L_{req} \in \mathcal{L}$\\
-     
-    }
-    \Function{\CRReply(\textit{req}, \textit{i}, arrival\_ts)}{
-        \Wait $entry := bufferedMap\find{req} \neq NULL$\\
-        $entry.\mathrm{pracks}\mathrel{+}= 1$\\
-        $entry.\mathrm{pred\_ts}[i] = \mathrm{arrival\_ts}$\\
-        \If{$entry.\mathrm{pracks} == entry.\mathrm{preds}$}{
-            $entry.\mathrm{coordinated} \gets \textit{True}$\\
-        }
-        \If{$entry.\mathrm{committed} \land entry.\mathrm{coordinated}$}{
-            $entry.\mathrm{my\_sort\_ts} \gets \textit{foldl}(entry.\mathrm{pred\_ts})$\\
-            $\textit{bufferedMap}\pop(\textit{entry})$\\
-            $\textit{sortedTempLog}\insertSorted(\textit{entry})$\\
-            $\textit{SubmitCRAckResp}(entry.\mathrm{my\_sort\_ts}, \textit{req}, entry.\mathrm{succrq})$ to $L_{succrq} \in \mathcal{L}$\\
-        }    
-    }
-    \Function{\CRAckReply(\textit{ts}, \textit{pred}, \textit{req})}{
-        \Wait $entry := sortedTempLog\find{req} \neq NULL$\\
-        \Wait $sortedTempLog.hd() == entry$\\
-        $\textit{sortedTempLog}\pop(\textit{entry})$\\
-        $\textit{orderedLog}\append(\textit{entry})$\\
-        $entry.\mathrm{my\_ts} \gets \mathrm{max}(ShardTS, entry.\mathrm{my\_sort\_ts})$\\
-        $\mathrm{ShardTS} \gets entry.\mathrm{my\_ts} + 1$\\
-        $\mathrm{Running\_ShardTS} \gets \mathrm{ShardTS}$\\
-        \Send $\textit{FinalAccept}(\textit{entry})$ to all $r \in \mathcal{R}$\\             
-    }
-    \caption{IOCL Leader Coordination}
-    \label{shardprotocolcoord}
+  \caption{IOCL Leader Coordination}
+  \label{shardprotocolcoord}
+  \begin{algorithmic}[1]
+    \Procedure{\leaderSubmitCR}{\textit{*pred*}, \textit{*req*}}
+      \Statex \Comment{CR sent by client of req to shard carrying req's predecessor}
+      \State $pred.\mathrm{succrq} := \textit{req}$
+      \If{$\textit{entry} := \textit{orderedLog}\find(\textit{pred}) \neq \textit{NULL}$}
+        \State $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{seqno}, entry.\mathrm{my\_arrival\_ts}$ to $L\_{req} \in \mathcal{L}$
+        \State \textbf{return}
+        \EndIf
+      \State \textbf{wait} $\textit{entry} := \textit{bufferedMap}\find(\textit{pred}) \neq \textit{NULL}$
+      \State \textbf{wait} $(entry.\mathrm{committed})$
+      \State $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{seqno}, entry.\mathrm{my\_arrival\_ts})$ to $L\_{req} \in \mathcal{L}$
+      \EndProcedure
+    \Procedure{\CRReply}{\textit{*req*}, \textit{*i*}, arrival\_ts}
+      \State \textbf{wait} $entry := bufferedMap\find{req} \neq NULL$
+      \State $entry.\mathrm{pracks}\mathrel{+}= 1$
+      \State $entry.\mathrm{pred\_ts}[i] = \mathrm{arrival\_ts}$
+      \If{$entry.\mathrm{pracks} == entry.\mathrm{preds}$}
+        \State $entry.\mathrm{coordinated} \gets \textit{True}$
+        \EndIf
+      \If{$entry.\mathrm{committed} \land entry.\mathrm{coordinated}$}
+        \State $entry.\mathrm{my\_sort\_ts} \gets \textit{foldl}(entry.\mathrm{pred\_ts})$
+        \State $\textit{bufferedMap}\pop(\textit{entry})$
+        \State $\textit{sortedTempLog}\insertSorted(\textit{entry})$
+        \State $\textit{SubmitCRAckResp}(entry.\mathrm{my\_sort\_ts}, \textit{req}, entry.\mathrm{succrq})$ to $L\_{succrq} \in \mathcal{L}$
+        \EndIf
+      \EndProcedure
+    \Procedure{\CRAckReply}{\textit{*ts*}, \textit{*pred*}, \textit{*req*}}
+      \State \textbf{wait} $entry := sortedTempLog\find{req} \neq NULL$
+      \State \textbf{wait} $sortedTempLog.hd() == entry$
+      \State $\textit{sortedTempLog}\pop(\textit{entry})$
+      \State $\textit{orderedLog}\append(\textit{entry})$
+      \State $entry.\mathrm{my\_ts} \gets \mathrm{max}(ShardTS, entry.\mathrm{my\_sort\_ts})$
+      \State $\mathrm{ShardTS} \gets entry.\mathrm{my\_ts} + 1$
+      \State $\mathrm{Running\_ShardTS} \gets \mathrm{ShardTS}$
+      \State \textbf{send} $\textit{FinalAccept}(\textit{entry})$ to all $r \in \mathcal{R}$
+      \EndProcedure
+  \end{algorithmic}
 \end{algorithm}
 
+
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % %%%%%%%%% Ellis CT Recovery %%%%%%%%%%%%%%
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % \begin{algorithm}[!tb]
+
 %     \Function{\Recover()}{    
-%         \State $\textit{unorderedBag} \gets$ gather from quorum\\
-%         \State $\textit{orderedLog} \gets$ gather committed finals\\
+
+%         \State $\textit{unorderedBag} \gets$ gather from quorum\\\\
+
+%         \State $\textit{orderedLog} \gets$ gather committed finals\\\\
+
 %         \For{$entry \in \textit{unorderedBag} \setminus \textit{orderedLog}$}{
+
 %             \If{$arrival\_TS$ found in any successor's timestamp chain}{
+
 %                 $entry.\mathrm{arrival\_TS} \gets arrival\_TS$
+
 %             }
+
 %             \Else{
+
 %                 $entry.\mathrm{arrival\_TS} \gets ShardTS$; $ShardTS \gets ShardTS + 1$
+
 %             }
+
 %             \If{$pred\_arrivals$ found from all preds}{
+
 %                 $entry.\mathrm{final\_TS} \gets \max(\foldl(pred\_arrivals), entry.\mathrm{arrival\_TS})$
+
 %             }
+
 %             \Else{
+
 %                 $entry.\mathrm{final\_TS} \gets entry.\mathrm{arrival\_TS}$
+
 %             }
-%             $\textit{orderedLog}\insertSorted(entry)$; $entry.\mathrm{ready} \gets True$\\
+
+%             $\textit{orderedLog}\insertSorted(entry)$; $entry.\mathrm{ready} \gets True$\\\\
+
 %         }
-%         $ShardTS \gets \max_{e \in \textit{orderedLog}} e.\mathrm{final\_TS} + 1$\\
-%         \Send $\textit{FinalAccept}(\textit{orderedLog})$ to all $r \in \mathcal{R}$\\
-%         \algorithmiccomment{New leader resumes normal operation}\\
+
+%         $ShardTS \gets \max\_{e \in \textit{orderedLog}} e.\mathrm{final\_TS} + 1$\\\\
+
+%         \Send $\textit{FinalAccept}(\textit{orderedLog})$ to all $r \in \mathcal{R}$\\\\
+
+%         \algorithmiccomment{New leader resumes normal operation}\\\\
+
 %     }
+
 %     \caption{Ellis\_CT Recovery Procedure}
+
 %     \label{ellis-ct-recovery}
+
 % \end{algorithm}
 
 
+
+
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % %%%%%%%%% OG MD-LIN Failover %%%%%%%%%%%%%%
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % % getSuccessor(e)
+
 % % If e is in committed but not ordered
+
 % % BLOCK until I get my successor, then send back my_successor_ts -1
+
 % % Else if e in ordered 
+
 % % Return e.ts
+
 % % Else
+
 % % Return inf
 
+
+
 % \begin{algorithm}[!tb]
-%     \State $\mathcal{L} \gets \{...\}$ \algorithmiccomment{Shard Leaders}\\
-%     \State $\mathcal{R}$ \algorithmiccomment{Set of all replicas in shard}\\
-%     % \State $n$ \algorithmiccomment{Number of replicas in shard}\\
-%     \textbf{parameter} $E$ \algorithmiccomment{Committed but not ordered ops}\\
+
+%     \State $\mathcal{L} \gets \{...\}$ \algorithmiccomment{Shard Leaders}\\\\
+
+%     \State $\mathcal{R}$ \algorithmiccomment{Set of all replicas in shard}\\\\
+
+%     % \State $n$ \algorithmiccomment{Number of replicas in shard}\\\\
+
+%     \textbf{parameter} $E$ \algorithmiccomment{Committed but not ordered ops}\\\\
+
 %     \Function{\Recover(\textit{E})}{
+
 %         \For{$\mathrm{each}$ $r \in R$}{ 
-%                 \Wait receive $E_r$\\
-%                 $E \gets E\cup E_r$\\
+
+%                 \Wait receive $E_r$\\\\
+
+%                 $E \gets E\cup E_r$\\\\
+
 %         }
+
 %         \For{$\mathrm{each}$ $ e \in E$}{
-%             $e.\mathrm{ts\_chain} \gets NULL$\\
-%             $e.\mathrm{exec} \gets True$\\
+
+%             $e.\mathrm{ts\_chain} \gets NULL$\\\\
+
+%             $e.\mathrm{exec} \gets True$\\\\
+
 %         }
-%         \State $A, B, noExec \gets FilterSets(E)$\\
-%         $A\sorting(\text{by} \enspace ts\_chain[-1])$\\
-%         $q \gets \constructQueue(A)$\\
-%         $last \gets q\qpeak()$\\
-%         $\mathrm{shard\_ts} \gets last.\mathrm{ts\_chain}[-1] + 1$\\
-%         % $D \gets \constructMap()$\\
+
+%         \State $A, B, noExec \gets FilterSets(E)$\\\\
+
+%         $A\sorting(\text{by} \enspace ts\_chain[-1])$\\\\
+
+%         $q \gets \constructQueue(A)$\\\\
+
+%         $last \gets q\qpeak()$\\\\
+
+%         $\mathrm{shard\_ts} \gets last.\mathrm{ts\_chain}[-1] + 1$\\\\
+
+%         % $D \gets \constructMap()$\\\\
+
 %         % \For{$e \in B$}{
+
 %         %     \If{$e.\mathrm{PID} \notin D$}{
-%         %         $D[e.\mathrm{PID}] \gets []$\\
+
+%         %         $D[e.\mathrm{PID}] \gets []$\\\\
+
 %         %     }
-%         %     $D[e.\mathrm{PID}]\append(e)$\\
+
+%         %     $D[e.\mathrm{PID}]\append(e)$\\\\
+
 %         % }
+
 %         % \For{$client \in D$}{
-%         %     $client\sorting(\text{by} \enspace e.\mathrm{seqno})$\\
+
+%         %     $client\sorting(\text{by} \enspace e.\mathrm{seqno})$\\\\
+
 %             % \For{$e \in client$}{
+
 %             \For{$e \in B$}{
-%                 $ts\_chain, pred\_ts \gets [], -1$\\
+
+%                 $ts\_chain, pred\_ts \gets [], -1$\\\\
+
 %                 \label{B_begin}
+
 %                 \If{$\textit{e.pred} \neq \textit{NULL}$}{
-%                     \Send $\textit{SubmitCR}(\textit{e.pred}, \textit{e})$ to $L_{e.pred} \in \mathcal{L}$\\
-%                     \Wait receive $\textit{SubmitCRRespRecv}(e, exec, ts\_chain)$ from $S_e.\mathrm{pred}$\\
+
+%                     \Send $\textit{SubmitCR}(\textit{e.pred}, \textit{e})$ to $L\_{e.pred} \in \mathcal{L}$\\\\
+
+%                     \Wait receive $\textit{SubmitCRRespRecv}(e, exec, ts\_chain)$ from $S_e.\mathrm{pred}$\\\\
+
 %                     \If{$exec = False$}{
-%                         $e.\mathrm{ts\_chain \gets NULL}$\\
-%                         $noExec\adds(e)$\\
+
+%                         $e.\mathrm{ts\_chain \gets NULL}$\\\\
+
+%                         $noExec\adds(e)$\\\\
+
 %                         \Continue
+
 %                     }
-%                     $e.\mathrm{ts\_chain \gets ts\_chain}$\\
-%                     $pred\_ts \mathrm{\gets ts\_chain[-1]}$\\
+
+%                     $e.\mathrm{ts\_chain \gets ts\_chain}$\\\\
+
+%                     $pred\_ts \mathrm{\gets ts\_chain[-1]}$\\\\
+
 %                 }
-%                 $my\_ts \gets \mathrm{max}(pred\_ts+1, \mathrm{shard\_ts})$\\
-%                 $\mathrm{shard\_ts} \gets my\_ts + 1$\\
-%                 $e.\mathrm{ts\_chain}\append(my\_ts)$\\
+
+%                 $my\_ts \gets \mathrm{max}(pred\_ts+1, \mathrm{shard\_ts})$\\\\
+
+%                 $\mathrm{shard\_ts} \gets my\_ts + 1$\\\\
+
+%                 $e.\mathrm{ts\_chain}\append(my\_ts)$\\\\
+
 %                 \label{B_end}
-%                 $q\qpush(e)$\\
+
+%                 $q\qpush(e)$\\\\
+
 %             }
+
 %         % }
-%         $q\qpush(noExec)$\\
-%         \Send $\textit{FinalAccept}(\textit{q})$ to all $r \in \mathcal{R}$\\
-%         \algorithmiccomment{New leader begins taking new client requests}\\
+
+%         $q\qpush(noExec)$\\\\
+
+%         \Send $\textit{FinalAccept}(\textit{q})$ to all $r \in \mathcal{R}$\\\\
+
+%         \algorithmiccomment{New leader begins taking new client requests}\\\\
+
 %     }
+
 %     \caption{MD-Lin Failover}
+
 %     \label{failover}
+
 % \end{algorithm}
 
 
+
+
+
 % \begin{algorithm}[!tb]
-%     \State $\mathcal{L} \gets \{...\}$ \algorithmiccomment{Shard Leaders}\\
-%     \State $\textit{R}$ \algorithmiccomment{Set of all replicas in shard}\\
-%     % \State $n$ \algorithmiccomment{Number of replicas in shard}\\
-%     \textbf{parameter} $E$ \algorithmiccomment{Committed but not ordered ops}\\
+
+%     \State $\mathcal{L} \gets \{...\}$ \algorithmiccomment{Shard Leaders}\\\\
+
+%     \State $\textit{R}$ \algorithmiccomment{Set of all replicas in shard}\\\\
+
+%     % \State $n$ \algorithmiccomment{Number of replicas in shard}\\\\
+
+%     \textbf{parameter} $E$ \algorithmiccomment{Committed but not ordered ops}\\\\
+
 %     \Function{\getChain(E)}{
-%         $V \gets$ constructEmptySet($|E|$) \\
+
+%         $V \gets$ constructEmptySet($|E|$) \\\\
+
 %         \For{$e_i \in E$}{
+
 %             \If{$\exists \enspace \textit{o} \notin \mathrm{orderedLog} \enspace \land \enspace o.\mathrm{committed} \enspace \land \enspace o.\mathrm{pred} = e$}{
-%                 \Send $\textit{getTimestampChain}(o)$ to all $S$~\\
-%                 \Wait receive $\textit{getTimestampChainReply}(ts\_chain, execute)$ from $S$ \\
+
+%                 \Send $\textit{getTimestampChain}(o)$ to all $S$\~\\\\
+
+%                 \Wait receive $\textit{getTimestampChainReply}(ts\_chain, execute)$ from $S$ \\\\
+
 %                 \label{mytsminus1}
+
 %                 \If{$execute$}{
-%                     $ts\_chain\pop()$\\
-%                     $V_i \gets (ts\_chain, True)$\\
+
+%                     $ts\_chain\pop()$\\\\
+
+%                     $V_i \gets (ts\_chain, True)$\\\\
+
 %                 }
+
 %                 \Else{
-%                     $V_i \gets (NULL, False)$\\
+
+%                     $V_i \gets (NULL, False)$\\\\
+
 %                 }
+
 %             }
+
 %             \If{$\exists \enspace \textit{o} \in \mathrm{orderedLog} \enspace \land \enspace o.\mathrm{pred} = e$}{
+
 %                 $V_i \gets$ ($o.\mathrm{ts\_chain}, o.\mathrm{execute}$)
+
 %             }
+
 %             \Else{
+
 %                 $V_i \gets$ ($NULL, True$)
+
 %             }
+
 %         }
+
 %         \Return $V$
+
 %     }
+
+
 
 %     \Function{FilterSets(E)}{
-%         \State $A, B, noExec \gets \{\}$\\
+
+%         \State $A, B, noExec \gets \{\}$\\\\
+
 %         \For{$\mathrm{each}$ $s \in S$}{
-%             \Send $\textit{getTimestampChain}(E)$ to $s$\\
-%             \Wait receive $\textit{getTimestampChainReply}(TS, exec)$ from $s$\\
+
+%             \Send $\textit{getTimestampChain}(E)$ to $s$\\\\
+
+%             \Wait receive $\textit{getTimestampChainReply}(TS, exec)$ from $s$\\\\
+
 %             \For{$\mathrm{each}$ $ts\_chain_i, exec_i \in TS, exec$}{
+
 %                 \If{$ts\_chain_i \neq NULL$}{
-%                     $ts\_chain_i\pop()$\\
-%                     $e_i.ts\_chain = ts\_chain_i$\\
+
+%                     $ts\_chain_i\pop()$\\\\
+
+%                     $e_i.ts\_chain = ts\_chain_i$\\\\
+
 %                 }
+
 %                 \If{$exec_i \neq True$}{
-%                     $e_i.exec = False$\\
+
+%                     $e_i.exec = False$\\\\
+
 %                 }
+
 %             }
+
 %         }
+
 %         \For{$\mathrm{each}$ $e \in E$}{
+
 %             \If{$e.\mathrm{exec} = False$}{
-%                 $noExec\adds(e)$\\
+
+%                 $noExec\adds(e)$\\\\
+
 %                 \Continue
+
 %             }
+
 %             \If{$e.\mathrm{ts\_chain} = NULL$}{
-%                 $B\adds(e)$\\
+
+%                 $B\adds(e)$\\\\
+
 %             }
+
 %             \Else{
-%                 $A\adds(e)$\\
+
+%                 $A\adds(e)$\\\\
+
 %             }
+
 %         }
+
 %         \Return $A, B, noExec$
+
 %     }
+
 %     % \Function{\getPredecessor(\textit{req})}{
-        
-%     %     \Wait until $e.\mathrm{coordinated} \enspace \lor \enspace \textit{e} \in \mathrm{orderedLog}$\\
+
+%     %     \Wait until $e.\mathrm{coordinated} \enspace \lor \enspace \textit{e} \in \mathrm{orderedLog}$\\\\
+
 %     %     \Return $e.\mathrm{ts\_chain}$
+
 %     % }
+
 %     % \Function{\getSuccessor(\textit{E})}{
-%     %     $V \gets$ constructEmptySet($|E|$) \\
+
+%     %     $V \gets$ constructEmptySet($|E|$) \\\\
+
 %     %     \For{$e_i \in E$}{
+
 %     %         \If{$\exists \enspace \textit{o} \notin \mathrm{orderedLog} \enspace \land \enspace o.\mathrm{committed} \enspace \land \enspace o.\mathrm{pred} = e$}{
-%     %             \Send $\textit{getSuccessor}(o)$ to all $S$~\\
-%     %             \Wait receive $\textit{getSuccessorReply}(ts)$ from $S$ \\
+
+%     %             \Send $\textit{getSuccessor}(o)$ to all $S$\~\\\\
+
+%     %             \Wait receive $\textit{getSuccessorReply}(ts)$ from $S$ \\\\
+
 %     %             \label{mytsminus1}
+
 %     %             $V_i \gets ts-1$
+
 %     %         }
+
 %     %         \If{$\exists \enspace \textit{o} \in \mathrm{orderedLog} \enspace \land \enspace o.\mathrm{pred} = e$}{
+
 %     %             $V_i \gets$ $o.\mathrm{ts}$
+
 %     %         }
+
 %     %         \Else{
+
 %     %             $V_i \gets$ $\infty$
+
 %     %         }
+
 %     %     }
+
 %     %     \Return $V$
+
 %     % }
+
 %     \caption{MD-Lin Failover Helper Functions}
+
 %     \label{failover_helpers}
+
 % \end{algorithm}
+
+
 
 
 
