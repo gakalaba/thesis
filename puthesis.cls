@@ -11,7 +11,7 @@
   \else June\fi\fi}
 \def\copyrightyear#1{\gdef\@copyrightyear{#1}}
 \def\@copyrightyear{\number\year}
-\def\adviser#1{\gdef\@adviser{#1}}
+\def\advisers#1{\gdef\@advisers{#1}}
 \long\def\@abstract{\@latex@error{No \noexpand\abstract given}\@ehc}
 \newcommand*{\frontmatter}{
   \pagenumbering{roman}
@@ -87,7 +87,7 @@
     Recommended for Acceptance \\
     by the \@deptpref \\
     \@dept \\
-    Adviser: \@adviser
+    Advisers: \@advisers
   \end{center}
   \vspace{.3in}
   \extravspace{.3in}
