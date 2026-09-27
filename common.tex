@@ -1,0 +1,72 @@
+\def\mpaxos{Multi-Paxos\xspace}
+\def\vr{Viewstamped Replication\xspace}
+%\def\sdl{Single-dispatch Linearizability\xspace}
+\def\sdl{Linearizability\xspace}
+\def\mdllong  {Invocation-Order Concurrent Linearizability\xspace}
+\def\mdl{IOC Linearizability\xspace}
+\def\Mdl{IOC Linearizability\xspace}
+\def\iocll{IOC Linearizable\xspace}
+\def\IOCL{IOCL\xspace}
+\def\ogs{data-independent ordering requirements\xspace}
+\def\diors{DIORs\xspace}
+% \def\sd{single-dispatch Linearizability\xspace}
+\def\md{IOC Linearizability\xspace}
+\def\protocol {Ellis\xspace}
+\def\system {Ellis\xspace}
+
+\newcommand*{\sys}{Ellis}
+\newcommand*{\ect}{Ellis\_CT}
+\newcommand*{\elin}{Ellis\_Linear}
+% \newcommand*{\SDL}{single-dispatch Linearizability}
+\newcommand*{\MDL}{IOC Linearizability}
+\newcommand*{\singledispatch}{single-dispatch}
+\newcommand*{\Singledispatch}{Single-dispatch}
+\newcommand*{\multidispatch}{invocation-order concurrent}
+\newcommand*{\Multidispatch}{Invocation-Order Concurrent}
+\newcommand*{\lin}{linearizability}
+\newcommand*{\Lin}{Linearizability}
+\newcommand*{\configone}{Edge Client}
+\newcommand*{\configtwo}{Colocated Shard Leader}
+\newcommand*{\configthree}{Colocated Clients and Shard Leaders}
+
+\newcommand{\noindentparagraph}[1]{\noindent \textbf{#1}}
+
+\newcommand{\showComments}{no}
+
+\newcommand{\note}[2]{
+    \ifthenelse{\equal{\showComments}{yes}}{{\color{#1}[#2]}}{}
+}
+\definecolor{worange}{RGB}{245, 128, 37}
+\definecolor{wblue}{RGB}{30, 120, 173}
+\definecolor{wpurple}{RGB}{138,43,226}
+\definecolor{wgreen}{RGB}{34,139,34}
+\newcommand{\wl}[1]{\note{worange}{W: #1}}
+\newcommand{\al}[1]{\note{wblue}{AL: #1}}
+\newcommand{\ak}[1]{\note{wpurple}{AK: #1}}
+\newcommand{\jh}[1]{\note{wgreen}{JH: #1}}
+
+
+\newcommand{\true}[1]{\textcolor{blue}{#1}}
+\definecolor{rgreen}{RGB}{0, 112, 60}
+\newcommand{\tbd}[1]{\textcolor{rgreen}{#1}}
+\newcommand{\todo}[1]{\textcolor{red}{TODO: #1}}
+\newcommand{\stale}[1]{\textcolor{red}{#1}}
+\newcommand{\awk}[1]{\textcolor{wgreen}{#1}}
+\definecolor{wpink}{RGB}{199,21,133}
+\newcommand{\weak}[1]{\textcolor{wpink}{#1}}
+
+\ifthenelse{\not\equal{\showComments}{yes}}{%
+%\renewcommand{\true}[1]{#1}
+%\renewcommand{\tbd}[1]{#1}
+\renewcommand{\awk}[1]{#1}
+\renewcommand{\weak}[1]{#1}
+\renewcommand{\todo}[1]{}
+}{}
+
+\newcommand{\commentcolor}[2]{
+ \ifthenelse{\equal{\showComments}{yes}}{{\color{#1}#2}}{#2}
+}
+\definecolor{spurple}{rgb}{0.6, 0.4, 0.8}
+\newcommand{\cbasuggest}[2]{\commentcolor{red}{\sout{#1}}\commentcolor{spurple}{#2}}
+
+\newcommand{\cutforspace}[1]{}

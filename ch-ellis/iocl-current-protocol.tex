@@ -1,0 +1,200 @@
+% \usepackage[margin=0.85in]{geometry}
+% \usepackage{amsmath,amssymb}
+% \usepackage[noend]{algpseudocode}
+% \usepackage{xcolor}
+% \usepackage{microtype}
+
+\newcommand{\opid}[1]{\mathit{id}(#1)}
+\newcommand{\keyof}[1]{\mathit{key}(#1)}
+\newcommand{\shardof}[1]{\mathit{shard}(#1)}
+\newcommand{\preds}[1]{\mathit{Pred}(#1)}
+\newcommand{\succs}[1]{\mathit{Succ}(#1)}
+\newcommand{\ats}[1]{\mathit{arrivalTS}[#1]}
+\newcommand{\fts}[1]{\mathit{finalTS}[#1]}
+\newcommand{\poq}[1]{\mathit{POQ}[#1]}
+\newcommand{\clog}{\mathit{commitLog}}
+\newcommand{\trues}{\textsc{true}}
+\newcommand{\false}{\textsc{false}}
+\newcommand{\vrone}{\textsc{VR-1}}
+\newcommand{\vrtwo}{\textsc{VR-2}}
+\newcommand{\Callout}[1]{\Statex\hspace{\algorithmicindent}\textcolor{red!70!black}{\textbf{Open point:} #1}}
+
+\section{Current ellis Protocol: Proof-Oriented Pseudocode}
+
+\paragraph{Scope.}
+This pseudocode records the current protocol described in prose.  Each operation
+$o$ has data $(\mathit{type},\mathit{key},\mathit{value},\mathit{client},
+\mathit{seqno})$.  A client may have several outstanding operations.  At the
+invocation of $o$, $\preds{o}$ is a snapshot of all other operations then
+outstanding at that client.  The relation $p\in\preds{o}$ is the protocol's
+cross-shard predecessor relation.
+
+\paragraph{Messages.}
+The coordination messages are
+$\textsc{CoordReq}(p,o,L_o)$,
+$\textsc{Arrival}(p,o,\ats{p})$, and
+$\textsc{FinalAck}(p,o)$.  The last message contains no timestamp; it asserts
+only that $p$'s final timestamp has been fixed.  Messages are idempotent and
+identified by operation IDs.  Duplicate messages and duplicate VR replies do
+not change state.
+
+\paragraph{Shard state.}
+Each shard leader maintains a monotonically increasing $\mathit{ShardTS}$, an
+unordered durable bag produced by the first VR round, one pending ordering
+queue $\poq{k}$ for every key $k$, and one shard-wide ordered commit log
+$\clog$.  A POQ is sorted by the operation's current $\fts{}$ value.  The
+commit log is ordered by its append indices and is also the shard's execution
+order.
+
+\begin{algorithm}[t]
+  \caption{Client invocation and predecessor coordination}
+  \label{alg:iocl-client}
+  \begin{algorithmic}[1]
+    \State $\mathit{outstanding} \gets \emptyset$
+    \Procedure{Invoke}{$o$}
+      \State $\preds{o} \gets \mathit{outstanding}$
+      \State $\mathit{outstanding} \gets \mathit{outstanding}\cup\{o\}$
+      \State send $\textsc{Submit}(o,\preds{o})$ to the leader of $\shardof{o}$
+      \ForAll{$p\in\preds{o}$}
+        \State send $\textsc{CoordReq}(p,o,L_o)$ to the leader of $\shardof{p}$
+      \EndFor
+    \EndProcedure
+    \Procedure{ReceiveReply}{$o,v$}
+      \State $\mathit{outstanding} \gets \mathit{outstanding}\setminus\{o\}$
+      \State return $v$ to the application
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[t]
+  \caption{First VR round and coordination at a shard leader}
+  \label{alg:iocl-first-and-coordination}
+  \begin{algorithmic}[1]
+    \Procedure{ReceiveSubmit}{$o,\preds{o}$}
+      \State $\mathit{record}_1(o)\gets
+        \langle\mathit{data}(o),\preds{o}\rangle$
+      \State begin \vrone{} replication of $\mathit{record}_1(o)$ into the
+        unordered bag
+    \EndProcedure
+
+    \Procedure{VR1Durable}{$o$}
+      \Comment{A quorum has durably replicated $\mathit{record}_1(o)$}
+      \State $\mathit{firstDurable}[o]\gets\trues$
+      \State $\ats{o}\gets\mathit{ShardTS}$;
+        $\mathit{ShardTS}\gets\mathit{ShardTS}+1$
+      \State $\fts{o}\gets\ats{o}$
+      \State insert $o$ into $\poq{\keyof{o}}$, sorted by $\fts{}$
+      \ForAll{$(o,s,L_s)\in\succs{o}$}
+        \State send $\textsc{Arrival}(o,s,\ats{o})$ to $L_s$
+      \EndFor
+      \State \Call{TryFinalize}{$o$}
+    \EndProcedure
+
+    \Procedure{ReceiveCoordReq}{$p,o,L_o$}
+      \State $\succs{p}\gets\succs{p}\cup\{(p,o,L_o)\}$
+      \If{$\mathit{firstDurable}[p]$}
+        \State send $\textsc{Arrival}(p,o,\ats{p})$ to $L_o$
+      \Else
+        \State buffer the request until \Call{VR1Durable}{$p$}
+      \EndIf
+      \If{$\mathit{finalFixed}[p]$}
+        \State send $\textsc{FinalAck}(p,o)$ to $L_o$
+        \Comment{necessary late-registration behavior}
+      \EndIf
+    \EndProcedure
+
+    \Procedure{ReceiveArrival}{$p,o,t$}
+      \State $\mathit{predArrival}[o][p]\gets t$
+      \State \Call{TryFinalize}{$o$}
+    \EndProcedure
+
+    \Procedure{TryFinalize}{$o$}
+      \If{$\mathit{firstDurable}[o]\ \land\
+        \operatorname{dom}(\mathit{predArrival}[o])=\preds{o}$}
+        \State $\displaystyle
+          \fts{o}\gets
+          \max\!\left(\{\ats{o}\}\cup
+            \{\fts{p}+1:p\in\preds{o}\}\right)$
+        \State resort $o$ in $\poq{\keyof{o}}$ by its new $\fts{o}$
+        \State $\mathit{finalFixed}[o]\gets\trues$;
+          $\mathit{ready}[o]\gets\trues$
+        \ForAll{$(o,s,L_s)\in\succs{o}$}
+          \State send $\textsc{FinalAck}(o,s)$ to $L_s$
+        \EndFor
+        \State \Call{TryOrder}{$o$}
+      \EndIf
+      \Callout{The stated formula needs every $\fts{p}$, but the specified
+      incoming numeric messages provide only $\ats{p}$.  The protocol must
+      define how these final values become locally available.}
+    \EndProcedure
+
+    \Procedure{ReceiveFinalAck}{$p,o$}
+      \State $\mathit{predFinalAck}[o]
+        \gets\mathit{predFinalAck}[o]\cup\{p\}$
+      \State \Call{TryExecuteHead}{}
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[t]
+  \caption{Per-key ordering, second VR round, and ordered execution}
+  \label{alg:iocl-order-execute}
+  \begin{algorithmic}[1]
+    \Procedure{TryOrder}{$o$}
+      \If{$\mathit{ready}[o]\ \land\
+        o=\operatorname{head}(\poq{\keyof{o}})$}
+        \State remove $o$ from $\poq{\keyof{o}}$
+        \State $i\gets |\clog|+1$; append a reserved entry for $o$ at index $i$
+        \State $\mathit{record}_2(o)\gets
+          \langle i,\mathit{data}(o),\fts{o},\mathit{predArrival}[o]\rangle$
+        \State begin \vrtwo{} replication of $\mathit{record}_2(o)$ at
+          commit-log index $i$
+        \State \Call{TryOrder}{the newly exposed head of $\poq{\keyof{o}}$}
+      \EndIf
+      \Callout{The prose and structured description sort only by $\fts{}$ and give no tie-break rule.
+      Equal final timestamps therefore leave the POQ head undefined.}
+    \EndProcedure
+
+    \Procedure{VR2Durable}{$o,i$}
+      \Comment{A quorum has durably replicated the entry and its index}
+      \State $\mathit{orderedAndReplicated}[o]\gets\trues$
+      \State \Call{TryExecuteHead}{}
+    \EndProcedure
+
+    \Procedure{TryExecuteHead}{}
+      \While{there is a first unexecuted entry $o$ in $\clog$}
+        \If{$\mathit{orderedAndReplicated}[o]\ \land\
+          \mathit{predFinalAck}[o]=\preds{o}$}
+          \State $v\gets\Call{Execute}{\mathit{data}(o)}$
+          \State $\mathit{executed}[o]\gets\trues$
+          \State send $\textsc{Reply}(o,v)$ to $\mathit{client}(o)$
+        \Else
+          \State \textbf{break}
+          \Comment{shard-wide commit-log execution barrier}
+        \EndIf
+      \EndWhile
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+\paragraph{Ordering facts exposed to a correctness proof.}
+The algorithm makes three relations explicit.  First,
+$p\rightarrow_{\mathrm{inv}}o$ is recorded by the client when $p$ precedes
+$o$ in that client's invocation order; outstanding such operations form
+$\preds{o}$.  Second, operations on one object execute in the order induced by
+their positions in their shard's commit log.  Third, a response is sent only
+after execution, so if $p$ returns before $o$ is invoked, then
+$p\rightarrow_{\mathrm{rt}}o$.  The intended later proof must show that the
+union of per-object execution order, client invocation order, and real-time
+order is acyclic.
+
+\paragraph{Unresolved semantic obligations.}
+The red annotations are deliberately not filled in by guesses.  In addition,
+the prose increments $\mathit{ShardTS}$ only when assigning an arrival
+timestamp.  It does not advance the counter when a much larger final timestamp
+is chosen.  Consequently, a later same-key operation can receive an arrival
+timestamp below an earlier operation's already-fixed final timestamp.  The
+protocol or proof must explain why this cannot invalidate the POQ decision, or
+must add a clock-advance rule.  The timing and durability of successor
+registration across leader changes also remain unspecified.
+

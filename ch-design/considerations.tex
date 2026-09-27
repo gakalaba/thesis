@@ -1,0 +1,39 @@
+\section{Protocol Design Considerations}
+
+\subsection{Ordering Requirements}
+
+Two backend operations have an ordering requirement (OR) if they must take effect in a specific order to ensure application correctness. Operations with ORs must also cascade failures: an operation should take effect only if all preceding operations succeed. 
+
+An important distinction is data dependence. Operations with data dependencies naturally have ORs. We focus on data-independent operations with ORs, since these can be issued concurrently.
+
+Figure~\ref{lst:or_ex} demonstrates ORs in a Redis-based application[REDIS]. The function \texttt{add\_test\_program} creates a shared object and sets metadata such as permissions, access control lists, and directory membership. These operations must occur in a specific order to maintain correctness.
+
+The object must be created (1) before any metadata (2–4) becomes visible; otherwise, users may observe references to non-existent objects. Permissions (2) must be set before access control lists (3), or authorized users may encounter errors. Access control lists (3) must be set before adding the object to the shared directory (4), or unintended users may gain access.
+
+Violating ORs leads to two classes of errors. First, concurrent operations can interleave with misordered operations, exposing inconsistent intermediate state. For example, reversing (3) and (4) allows concurrent reads to observe incomplete permissions, causing assertion failures (8). Second, if failures do not cascade, the system may reach a persistent inconsistent state even without concurrency. For instance, if (3) fails but (4) succeeds, later executions of \texttt{run\_test\_program} will violate application invariants.
+
+% \begin{figure}[!h]
+%  \begin{minted}[]{python}
+% def add_test_program(object):
+% (1) redis.set("objName", object)
+% (2) redis.set("objName_exec", true)
+% (3) redis.sadd("ACL_admins", "objName")
+% (4) redis.sadd("sharedDirTest", "objName")
+% (5) print("completed.")
+
+% def run_test_program("sharedDir"):
+% (6) ["objName"] = redis.smembers("sharedDirTest")
+% (7) object = redis.get("objName")
+% (8) assert redis.get("objName_exec") == true
+% (9) Execute(object)
+%  \end{minted}
+%  \caption{Application logic with ORs across backend operations.}
+%  \label{lst:or_ex}
+%  \end{figure}
+
+\paragraph{ORs with Linearizability.}
+Linearizability guarantees ordering only for operations with real-time relationships. Thus, applications must issue operations with ORs sequentially.\footnote{Linearizability was originally defined under ``well-formed executions,'' where each process alternates between invocation and response.}
+
+This sequential execution can incur significant latency, especially when application requests fan out into many backend operations. While \texttt{add\_test\_program} has fanout 4, modern applications often have fanouts of 10–1000~[TAIL AT SCALE]. For example, Meta reports that a single web request can trigger thousands of operations[WYATT FB PAPER]. As a result, application latency scales linearly with fanout under Linearizability.
+
+We next introduce a consistency model that preserves ordering across concurrent operations from a client, allowing applications with ORs to exploit concurrency. Since operations take effect in invocation order, ORs can be naturally expressed through the program’s sequential invocation order.

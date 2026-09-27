@@ -1,0 +1,101 @@
+\section{Failover and Leader Election}
+
+\paragraph{VR message cost.}
+For $N$-way replication, each VR leader processes
+\[
+c_{\mathrm{VR}} = 3N - 1
+\]
+messages per request.
+
+\paragraph{IOCL message cost by role.}
+For fanout $f$, let role $i \in \{1,\dots,f\}$ denote the $i$th shard in the request.
+The corresponding IOCL leader processes
+\[
+c_i = 5N + 3f - i - 5
+\]
+messages per request.
+
+Thus, the relative maximum throughput of IOCL leader $i$ compared to a VR leader is
+\[
+R_i = \frac{3N-1}{5N+3f-i-5}.
+\]
+
+\paragraph{IOCL bottleneck throughput.}
+Since $c_i$ decreases with $i$, shard $1$ is the bottleneck. Hence the system-level
+relative maximum throughput under a fixed role assignment is
+\[
+R_{\mathrm{sys}}^{\mathrm{fixed}}
+= \frac{3N-1}{5N+3f-6}.
+\]
+
+\paragraph{IOCL aggregate-work throughput.}
+Summing across all $f$ shard leaders,
+\[
+\sum_{i=1}^{f} c_i
+= \sum_{i=1}^{f} (5N+3f-i-5)
+= f(5N+3f-5) - \frac{f(f+1)}{2}.
+\]
+Therefore, the aggregate-work relative throughput is
+\[
+R_{\mathrm{sys}}^{\mathrm{agg}}
+=
+\frac{f(3N-1)}
+{f(5N+3f-5)-\frac{f(f+1)}{2}}
+=
+\frac{3N-1}{5N+\frac{5f-11}{2}}.
+\]
+
+\paragraph{Fixed role assignment across shards.}
+If physical shard $i$ always serves logical role $i$, then its relative maximum throughput is
+\[
+R_i^{\mathrm{fixed}}
+=
+\frac{3N-1}{5N+3f-i-5},
+\]
+and its relative throughput drop compared to VR is
+\[
+D_i^{\mathrm{fixed}}
+=
+1 - R_i^{\mathrm{fixed}}
+=
+1 - \frac{3N-1}{5N+3f-i-5}.
+\]
+
+\paragraph{Balanced role assignment across shards.}
+If each physical shard is equally likely to serve any role $i \in \{1,\dots,f\}$,
+then the average IOCL per-shard message cost is
+\[
+\bar c
+=
+\frac{1}{f}\sum_{i=1}^{f}(5N+3f-i-5)
+=
+5N+\frac{5f-11}{2}.
+\]
+Hence every shard has the same relative maximum throughput
+\[
+R_{\mathrm{shard}}^{\mathrm{bal}}
+=
+\frac{3N-1}{5N+\frac{5f-11}{2}},
+\]
+which is also the system-level relative maximum throughput:
+\[
+R_{\mathrm{sys}}^{\mathrm{bal}}
+=
+\frac{3N-1}{5N+\frac{5f-11}{2}}.
+\]
+The corresponding per-shard relative throughput drop is
+\[
+D_{\mathrm{shard}}^{\mathrm{bal}}
+=
+1 - \frac{3N-1}{5N+\frac{5f-11}{2}}.
+\]
+
+\paragraph{Benefit of balancing.}
+The multiplicative system-level improvement from balanced role assignment over fixed role assignment is
+\[
+\frac{R_{\mathrm{sys}}^{\mathrm{bal}}}{R_{\mathrm{sys}}^{\mathrm{fixed}}}
+=
+\frac{5N+3f-6}{5N+\frac{5f-11}{2}}.
+\]
+
+ 

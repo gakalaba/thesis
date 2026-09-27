@@ -1,0 +1,1059 @@
+\section{Transform}
+
+% \section{Correctness Proof}
+% \label{sec:correctness}
+We consider an arbitrary, well-formed execution $\alpha$ of a set of application processes interacting with an \sys{} service. We define $e_1 <_p e_2$ to mean that $e_1$ and $e_2$ were issued by the same client, and $e_1$ was invoked before $e_2$ by that client, or $\text{inv}(e_1) < \text{inv}(e_2)$; we say that $e_1$ is the \textit{predecessor} request to $e_2$, and $e_2$ is the \textit{successor} request to $e_1$. We also define $e_3 \rightarrow e_4$ to mean $e_3$ precedes $e_4$ in real time, or $\text{resp}(e_3) < \text{inv}(e_4)$. To reason about the order of operations in \sys{}, we define several terms:
+
+Given an operation $e$, we define it as \textit{committed} once a quorum of replicas of the relevant shard added it to their buffered log. We define it as \textit{ordered} once a quorum of replicas have added it to their log. We define it as \textit{coordinated} once the leader has received a coordination timestamp from the predecessor request.
+
+Finally, the sequential specification $\mathcal{G}_x$ of an object $x \in X$ is the set of all sequences of invocation-response pairs of reads and writes to $x \in X$ such that each read returns the value written by the most recent write.
+
+Recall that each operation in \sys{} is assigned a unique timestamp, $\epsilon$, once it is \textit{committed} and \textit{coordinated} by its \textit{predecessor}. Using these observations, we can define a total order over the operations to a single object $x \in X$, $<_x$ at each shard.
+
+\begin{lem}
+    \label{lemmaD8}
+    The sequence $S_x$ defined by $<_x$ over the invocation-response pairs of complete operations to object $x \in X$ is in the sequential specification $\mathcal{G}_x$.
+\end{lem}
+\begin{proof}
+    Each operation, $e$, is assigned a preliminary unique timestamp, $\epsilon$, once it is \textit{committed} and \textit{coordinated} by its \textit{predecessor}, $e_{pred}$, or if $e$ doesn't have a \textit{predecessor}, $\epsilon$ is assigned upon arrival and persisted among replicas when $e$ is \textit{ordered}. This timestamp might change only if the shard fails, after which $e$ will be assigned a new timestamp $\epsilon'$ by the failover procedure.
+    
+    Timestamps are assigned (normally and during failover) as $\epsilon = \max(\epsilon_\text{pred}+1, shard\_ts)$, where $\epsilon_\text{pred}$ is the timestamp the \textit{predecessor} received via \textit{coordination} and $shard\_ts$ is the shard's own local timestamp at the time of assignment. Before any operations are added to the shard's execution log, the initial value of the shard's local timestamp is $0$; during failover, the initial value is the timestamp of the last \textit{ordered} operation's plus 1. Importantly, between assigning every timestamp, the shard updates its own local timestamp as $shard\_ts = \epsilon + 1$. After an operation is assigned a timestamp, it is added to the log and replicated at this index with this timestamp, constructing $<_x$.
+
+    Since each $\epsilon$ is at least as large as $shard\_ts$ at the time of assignment, and $shard\_ts$ strictly increases between each timestamp assignment, all $\epsilon$ within a shard are unique and also strictly increase.
+
+    Finally, all replicas will apply operations to the state machine from the log in timestamp order. Since $S_x$ is the sequence of invocation-response pairs defined by $<_x$, it is in the object's sequential specification.
+\end{proof}
+
+% \begin{lem}
+%     \label{lemmagetpred}
+%     $\texttt{getPredecessor}(e)$ is guaranteed to eventually return.
+% \end{lem}
+
+% \begin{proof}
+%     If $e$ does not have a \textit{predecessor}, or the \textit{predecessor} is at the same shard as $e$, then by line \ref{neginfy} of algorithm \ref{failover}, it will be assigned a value of $-\infty$ immediately.
+
+%     Otherwise, it will invoke \texttt{getPredecessor}. 
+
+%     Otherwise, the \textit{predecessor} is at a separate shard. If the shard does not experience any failures, the \textit{predecessor} will eventually be assigned a timestamp and the shard will respond with a value to the call. 
+    
+%     If the shard of the \textit{predecessor} experiences failover, it will also eventually make calls to \texttt{getPredecessor} and \texttt{getSuccessor}. The calls to \texttt{getSuccessor} are always guaranteed to return and never block, as in algorithm \ref{failover}. The call to \texttt{getPredecessor}(\textit{predecessor}) will eventually hit a \textit{predecessor} operation that has no \textit{predecessor} and returns immediately, and using this return value and the value returned from the call to \texttt{getSuccessor} can complete failover. After this it can send a timestamp to the pending call to $\texttt{getPredecessor}(e)$.
+% \end{proof}
+
+% \begin{thm}[Hall's theorem]
+%     \label{Hall}
+%     $\mathcal{G}$ has a matching of size $|\mathcal{A}|$ if and only if for every $\mathcal{S} \subseteq \mathcal{A}$ we have $|N(\mathcal{S})|\geq|\mathcal{S}|$, where $N(\mathcal{S}) = {b \in \mathcal{B}: \; \exists a \in \mathcal{S} \; \text{with} \; (a, b) \in \mathcal{E}}$.
+% \end{thm}
+
+% \begin{lem}
+%     \label{failover_converges}
+%     The failover protocol always converges.
+% \end{lem}
+
+% \begin{proof}
+%     The failover protocol uses the Ford-Fulkerson algorithm to find a matching over the bipartite graph, $\mathcal{G}$, of committed-but-not-ordered operations and their timestamp candidates. To show this procedure converges, we must show that there exists at least one matching over $\mathcal{G}$, which we show by applying Hall's Theorem.
+
+%     To prove this, first we construct $\mathcal{G'}$, the bipartite graph of committed-but-not-ordered operations and their initial timestamp assignments \textit{prior} to failover. We construct $\mathcal{A'}$ as all the committed-but-not-ordered operations that prior to failover have externalized their initial timestamp assignments to their \textit{successors}, who have in turn calculated their own timestamps and been added to the log, and possibly externalized those timestamps to their respective \textit{successors}. We construct $\mathcal{B'}$ as the set of all initial timestamp assignments for each operation in $\mathcal{A'}$, and we add an edge between each vertex in $\mathcal{A'}$ and its assigned timestamp in $\mathcal{B'}$.
+
+%     Prior to failure, timestamp assignment completes as described by lines \ref{ts_assignment_pt1} and \ref{ts_assignment_pt2} in algorithm \ref{shardprotocolcoord}. Because the shard timestamp strictly increases between each assignment and because each assignment is at least as large as the shard timestamp, the initial timestamps across operations strictly increase in the committed-but-not-log order. Importantly, this implies all the initial timestamps are unique and that $|\mathcal{B'}| = |\mathcal{A'}|$ and $\forall a' \in \mathcal{A'}, N(a') = 1$. Because of this, it must be the case $\forall S \subseteq \mathcal{A'}: |N(S)| = |S|$. By Hall's theorem then, we know $\mathcal{G'}$ contains a perfect matching of size $|\mathcal{A'}|$.
+
+%     Finally, we construct the bipartite graph, $\mathcal{G}$, as follows:
+
+%     We create a set, $\mathcal{A}$ of vertices for each committed-but-not-ordered operation that has finite return values from \texttt{getSuccessor}. We then create an infinite set of vertices representing all the integers. Lastly, we construct our edge set $\mathcal{E}$: for each operation in $\mathcal{A}$, we add an edge between itself and each integer that is in the range strictly greater than the value returned from \texttt{getPredecessor} and strictly less than the value returned from \texttt{getSuccessor}. Denote the subset of integers that have an edge incident to them from at least one vertex in $\mathcal{A}$ as $\mathcal{B}$, and this set represents timestamp candidates for each committed-but-not-ordered operation.
+
+%     To show there exists a matching for each operation in $\mathcal{A}$, we first show that (1) $\mathcal{A} = \mathcal{A'}$ and we show that (2) $\forall a \in \mathcal{A}: N_{\mathcal{G}}(a) \supseteq N_{\mathcal{G'}}(a)$:
+    
+%     (1) It is easy to show $\mathcal{A} = \mathcal{A'}$ since by construction, $\mathcal{A'}$ contains all the operations that during failover will receive finite values from \texttt{getSuccessor}. 
+
+%     (2) As shown above, $\forall a \in \mathcal{A}, N_{\mathcal{G'}}(a) = 1$, which is the unique timestamp assigned prior to failure. By the assignment process \ref{ts_assignment_pt1}, this timestamp $N_{\mathcal{G'}}(a)$ is strictly larger than the operation $a$'s \textit{predecessor}. Further, by construction, $N_{\mathcal{G}}(a)$ contains all integer values strictly larger than the \textit{predecessor} and strictly less than \textit{successor}, therefore it must at least contain $N_{\mathcal{G'}}(a)$ and potentially other candidates in the range.
+
+%     Since $\mathcal{A} = \mathcal{A'}$ and $\forall a \in \mathcal{A}, a' \in \mathcal{A'}: N(a) \supseteq N(a')$, we have $\forall S \subseteq \mathcal{A}: |N_{\mathcal{G}}(S)| \geq |N_{\mathcal{G'}}(S)| = |S|$. Therefore, by Hall's theorem \ref{Hall}, $\mathcal{G'}$ contains a perfect matching and the failover protocol converges.
+% \end{proof}
+
+
+\begin{lem}
+\label{lemma1}
+Consider a pair of operations $e_1, e_2$ such that $e_1 <_p e_2$, and further assume each operation is committed, coordinated, and been assigned timestamp $\varepsilon_1, \varepsilon_2$, at their respective shards. Then $\varepsilon_1 < \varepsilon_2$.
+\end{lem}
+\begin{proof}
+We case upon the presence of shard leader failures:
+
+\wl{We "case"?}
+
+\noindentparagraph{Case 1.} \textit{No failures}.
+Let $e_1$ and $e_2$ be two operations such that $e_1 <_p e_2$.
+Consider the timestamp assignment process for $e_1$ and $e_2$. Let $\epsilon_1$ and $\epsilon_2$ be the timestamps assigned to $e_1$ and $e_2$, respectively.
+
+Since $e_1 <_p e_2$, $e_2$ sends a coordination request to $e_1$. Upon receiving the coordination request, $e_1$ responds with its timestamp $\epsilon_1$, which it cannot send until it is committed and coordinated. Consequently, upon receiving $\epsilon_1$, $e_2$ sets its timestamp $\epsilon_2 = \max(\epsilon_1 + 1, \epsilon_{\text{shard}2})$.
+
+This implies $\epsilon_2 \geq \epsilon_1 + 1$, or $\epsilon_1 < \epsilon_2$.
+
+\noindentparagraph{Case 2.} \textit{With failures}.
+We case upon which shard fails.
+
+\noindentparagraph{Subcase A.} \textit{Operations $e_1$ and $e_2$ are at separate shards. Shard with $e_1$ fails after $e_1$ is \textit{committed}, before it is \textit{ordered}. Shard with $e_2$ does not fail.}
+
+Assume shard with $e_1$ fails.
+
+During failover, all committed-but-not-ordered entries, including $e_1$, are processed and assigned new timestamps. Specifically, the new shard leader will call \texttt{getTimestampChain} for all committed-but-not-ordered entries, including $e_1$.
+
+If $e_1$ had been assigned a timestamp prior to failure and coordinated $e_2$ (or some \textit{predecessor} chain ending with $e_2$), then since we know the shard with $e_2$ does not fail, \texttt{getTimestampChain} will return a non-NULL value reflecting the timestamp\_chain of $e_2$ (or some operation invoked after $e_1$ and before $e_2$. Importantly, this timestamp\_chain will include the timestamp initially assigned to $e_1$ prior to failure, which the new shard leader will assign as $e_1$'s new timestamp during failure upon the return of \texttt{getTimestampChain}. As shown in Case 1, the timestamps assigned prior to failure abide by $e_1 <_p e_2 \implies \epsilon_1 < \epsilon_2$.
+
+If $e_1$ had not been assigned a timestamp prior to failure, or if $e_1$ had been assigned a timestamp prior to failure but had never coordinated $e_2$ (or some \textit{predecessor} chain ending with $e_2$), then \texttt{getTimestampChain} will return a NULL value. Importantly, $e_1$ will then be assigned a newly calculated timestamp according to lines \ref{B_begin} to \ref{B_end} of the failover protocol \ref{failover}.
+
+Since $e_2$ had not received $e_1$'s old timestamp prior to failure, this new timestamp, $\epsilon_1$, will trivially be strictly less than $\epsilon_2$. As shown in Case 1, during non-failover mode $\epsilon_2$ will be strictly larger than $\epsilon_1$ for any value assigned to $\epsilon_1$ during failover that is sent to the shard with $e_2$ once failover completes.
+
+\noindentparagraph{Subcase B.} \textit{Operations $e_1$ and $e_2$ are at separate shards. Shard with $e_2$ fails after $e_2$ is \textit{committed}, before it is \textit{ordered}. Shard with $e_1$ does not fail.}
+
+Assume shard with $e_2$ fails.
+
+During failover, all committed-but-not-ordered entries, including $e_2$, are processed and assigned new timestamps. Specifically, the new shard leader will call \texttt{getTimestampChain} for all committed-but-not-ordered entries, including $e_2$.
+
+If $e_2$ had been assigned a timestamp prior to failure and coordinated some \textit{successor}, then \texttt{getTimestampChain} will return a non-NULL value reflecting a timestamp\_chain including the timestamp initially assigned to $e_2$ prior to failure, which the new shard leader will assign as $e_2$'s new timestamp during failure upon the return of \texttt{getTimestampChain}. As shown in Case 1, the timestamps assigned prior to failure abide by $e_1 <_p e_2 \implies \epsilon_1 < \epsilon_2$.
+
+Otherwise, if $e_2$ didn't coordinate a \textit{successor}, then \texttt{getTimestampChain} will return a NULL value. Importantly, $e_2$ will then be assigned a newly calculated timestamp according to lines \ref{B_begin} to \ref{B_end} of the failover protocol \ref{failover}. Trivially, this new timestamp $\epsilon_2$ is strictly larger than $\epsilon_1$, since a call to \texttt{getPredecessorTS} is made and the new timestamp assigned is strictly larger than the predecessor timestamp.
+% didn't coordinate successor/didn't have successor/was never assigned
+
+\noindentparagraph{Subcase C.} \textit{Operations $e_1$ and $e_2$ are at the same shard. That shard with both $e_1$ and $e_2$ fails after $e_1$ and $e_2$ are both \textit{committed}, before they are \textit{ordered}.}
+
+Assume shard with $e_1$ and $e_2$ fails.
+
+During failover, the new shard leader will call \texttt{getTimestampChain} for all committed-but-not-ordered entries, including $e_1$ and $e_2$.
+
+Since $e_1$ was invoked before $e_2$, if it had been assigned an old timestamp that was externalized, that value would be contained in a timestamp chain returned from a call made to \texttt{getTimestampChain} on behalf of both $e_1$ and $e_2$, and as shown in the non-failure case, $\epsilon_1 < \epsilon_2$. 
+
+Otherwise, if both $e_1$ and $e_2$ receive NULL values from \texttt{getTimestampChain}, then $e_1$ will be processed before $e_2$ since entries are grouped by client PIDs and processed in sequence number order (lines \ref{B_begin} - \ref{B_end} of \ref{failover}. Thus when $e_2$ makes a call to \texttt{getPredecessorTS}, it will read the already assigned $\epsilon_1$ and pick an $\epsilon_2$ that is strictly larger.
+
+\noindentparagraph{Subcase D.} \textit{Operations $e_1$ and $e_2$ are at separate shards. Both shards with $e_1$ and $e_2$, respectively, fail after $e_1$ and $e_2$ are \textit{committed}, before each is \textit{ordered}.}
+
+Assume the shard with $e_1$ and the shard with $e_2$ both fail.
+
+During failover, the new shard leaders will call \texttt{getTimestampChain} for all committed-but-not-ordered entries, including $e_1$ and $e_2$.
+
+Just like in Subcase C, since $e_1$ was invoked before $e_2$, if it had been assigned an old timestamp that was externalized, that value would be contained in a timestamp chain returned from a call made to \texttt{getTimestampChain} on behalf of both $e_1$ and $e_2$, and as shown in the non-failure case, $\epsilon_1 < \epsilon_2$. 
+
+Lastly, if both $e_1$ and $e_2$ receive NULL values from \texttt{getTimestampChain}, then $e_1$ will be processed before $e_2$, since its call to \texttt{getPredecessorTS} will return immediately and $e_2$'s will block until an $\epsilon_1$ is assigned at the respective shard. Finally, $\epsilon_2$ will be trivially larger than $\epsilon_1$ since it will be assigned a value strictly larger than the value returned from \texttt{getPredecessorTS}.
+
+% Version with bipartite graph
+% The failover protocol uses the Ford-Fulkerson algorithm to find a matching over the bipartite graph, $\mathcal{G}$, of committed-but-not-ordered operations and their timestamp candidates. By lemma \ref{failover_converges}, this procedure converges. Since the set of candidate timestamps in the bipartite graph only contains unique candidates, the matching constructed assigns unique timestamps to all operations during failover. Furthermore, by construction, the candidate timestamps for each committed-but-not-ordered operation are within a range that is strictly larger than the operation's \textit{predecessor} and strictly less than the operation's \textit{successor}, thus the matching constructed will pick a new timestamp that is strictly larger than the \textit{predecessor} and strictly less than the \textit{successor}. Therefore  $e_1 <_p e_2 \implies \epsilon_1 < \epsilon_2$.
+
+
+% Version with sorting by successor
+% We case upon which shard fails.
+
+% \noindentparagraph{Subcase A.} \textit{Operations $e_1$ and $e_2$ are at separate shards. Shard with $e_2$ fails after $e_2$ is \textit{committed}, before it is \textit{ordered}. Shard with $e_1$ does not fail.}
+
+% Assume shard with $e_2$ fails.
+
+% During failover, all committed-but-not-ordered entries, including $e_2$, are processed and assigned new timestamps. Specifically, each entry gets a predecessor and successor timestamp via calls made to \texttt{getPredecessor} and \texttt{getSuccessor}, respectively, and the new shard leader sorts all committed-but-not-ordered entries by successor timestamp. Let $\epsilon_1$ and $\epsilon_2$ be the timestamps assigned to $e_1$ and $e_2$, respectively, where $\epsilon_1$ was never recalculated since the shard never failed.
+
+% By the failover protocol, $\epsilon_2 = \max(\epsilon_1 + 1, \epsilon_{\text{shard}2}) \geq \epsilon_1 + 1$, ensuring $\epsilon_1 < \epsilon_2$.
+
+% \noindentparagraph{Subcase B.} \textit{Operations $e_1$ and $e_2$ are at separate shards. Shard with $e_1$ fails after $e_1$ is \textit{committed}, before it is \textit{ordered}. Shard with $e_2$ does not fail.}.
+
+% Assume shard with $e_1$ fails.
+
+% By the failover protocol, the new shard leader will call \texttt{getPredecessor} and \texttt{getSuccessor} for all committed-but-not-ordered entries, including $e_1$, giving them a predecessor and successor timestamp, respectively, then it will sort them based on successor timestamp, and finally in sorted order assign them new timestamps. Importantly, \texttt{getSuccessor} will return since the shard with operation $e_2$ hasn't failed. Similarly, it is guaranteed that \texttt{getPredecessor} will return by lemma \ref{lemmagetpred}.
+
+% We prove by induction that during failover, for all timestamps assigned to the sorted set of committed-but-not-ordered entries, $\epsilon_i \leq \epsilon_i\_\text{succ}$.
+
+% \textbf{Base Case:} Consider the timestamp, $\epsilon_0$, assigned to the first processed entry, $e_0$, in the sorted set of committed-but-not-ordered entries.  $\epsilon_0 < \epsilon_0\_\text{succ}$
+% \\
+% When the new leader processes the 0th committed-but-not-ordered entry during failover, it will assign it a timestamp of
+% $$\epsilon_0 = \max(\epsilon_0\_\text{pred} + 1, shard\_ts_0)$$
+% If $\epsilon_0 = \epsilon_0\_pred + 1$, we know this is at most the value it used to coordinate its successor prior to failure, and that successor must have assigned itself a timestamp strictly larger than this sent value. Thus, $\epsilon_0 \leq \epsilon_0\_\text{succ}$
+
+% Else $\epsilon_0 = shard\_ts_0$.
+% Let's call the last ordered entry in the log at the start of failover $e_k$. The initial value of the shard timestamp, $\text{shard\_ts}_0$, assigned at the beginning of recovery is the timestamp of the last ordered entry, $\epsilon_k + 1$. 
+
+% It is possible that any of the committed-but-not-ordered entries had been assigned a timestamp prior to failover that was sent to a successor. We know all of these assigned timestamps must have been strictly larger than $\epsilon_k$, or at least as large as $shard\_ts_0$. And since during coordination, successors assign themselves strictly increasing timestamps, we also know the timestamps of any successors to entries after $e_k$ had timestamps strictly greater than $shard\_ts_0$.
+
+% Therefore, $\epsilon_0 \leq \epsilon_{0\_\text{succ}}$.
+
+
+% \textbf{Inductive Step:} Assume that the claim holds for some positive integer $i$. That is, consider the timestamp, $\epsilon_i$, assigned to some committed-but-not-ordered entry processed in the sorted order during failover, $e_i$, then $\epsilon_i \leq \epsilon_i\_\text{succ}$.
+
+% Now, we want to show that the claim also holds for $i+1$, i.e., we want to show $\epsilon_{i+1} \leq \epsilon_{i+1}\_\text{succ}$.
+
+% When the new leader processes committed-but-not-ordered entry $e_{i+1}$ during failover, it will assign it a timestamp of
+% $$\epsilon_{i+1} = \max(\epsilon_{i+1}\_\text{pred} + 1, shard\_ts_{i+1})$$
+% If $\epsilon_{i+1} = \epsilon_{i+1}\_\text{pred} + 1$, we know this is at most the value it used to coordinate its successor prior to failure, and that successor must have assigned itself a timestamp strictly larger than this sent value. Thus $\epsilon_{i+1} \leq \epsilon_{i+1}\_\text{succ}$.
+
+% Else $\epsilon_{i+1} = shard\_ts_{i+1}$. Between assigning every committed-but-not-ordered entry, the shard updates its timestamp to be the last timestamp assigned to an entry plus one, or $shard\_ts_{i+1} = \epsilon_i + 1$. Moreover, we know that $\epsilon_{i}\_\text{succ} \leq \epsilon_{i+1}\_\text{succ}$ due to sorted order by successor timestamps. Using our inductive hypothesis, we know $\epsilon_i \leq \epsilon_i\_\text{succ}$ or $\epsilon_i + 1 \leq \epsilon_i\_\text{succ}+1$. From all of this we can show,
+
+% $$\epsilon_{i+1} = shard\_ts_{i+1} = \epsilon_i + 1 \leq \epsilon_i\_\text{succ} + 1 \leq \epsilon_{i+1}\_\text{succ}$$.
+
+% \noindentparagraph{Subcase C.} \textit{Both shards with $e_1$ and $e_2$ fail after $e_1$ and $e_2$ are \textit{committed}, before each is \textit{ordered}. $e_1$ and $e_2$ could be at separate shards or the same shard.}
+
+% Assume both shards fail. Let's denote the shard with operation $e_1$ as $Shard_1$ and the shard with $e_2$ as $Shard_2$.
+
+% By the failover protocol, the new shard leaders at both shards will call \texttt{getPredecessor} and \texttt{getSuccessor} for all committed-but-not-ordered entries. When $Shard_1$'s new leader invokes \texttt{getSuccessor}, $Shard_2$ will respond with its return value from invoking \texttt{getSuccessor} minus 1, $\epsilon_2\_\text{succ} - 1$, as by line \ref{mytsminus1} in algorithm \ref{failover}. When $Shard_2$'s new leader invokes \texttt{getPredecessor}, $Shard_1$ will block until it has completed the failover procedure and assigned (and persisted) a final timestamp for $e_1$. 
+
+% By the reasoning in subcase B, $\epsilon_1 \leq \epsilon_2\_\text{succ} - 1$. Thus $Shard_2$'s new leader will receive a \textit{predecessor} timestamp for $e_2$ such that $\epsilon_2\_\text{pred} < \epsilon_2\_\text{succ}$ when \texttt{getPredecessor} finally returns. As in subcase A, $\epsilon_2 = \max(\epsilon_2\_\text{pred}+1, \epsilon_{shard2})$.
+
+% If $\epsilon_2 = \epsilon_2\_\text{pred}+1$ then since $\epsilon_2\_\text{pred} < \epsilon_2\_\text{succ}$, it follows $\epsilon_2 \leq \epsilon_2\_\text{succ}$.
+
+% Else $\epsilon_2 = \epsilon_{shard2}$. By similar inductive reasoning as in case B, it follows that $\epsilon_2 \leq \epsilon_2\_\text{succ}$.
+\end{proof}
+
+\begin{lem}
+\label{lemma2}
+Consider a pair of operations on the same shard $e_1, e_2$ such that $e_1 <_x e_2$, and further assume each operation is committed, coordinated, and been assigned timestamp $\varepsilon_1, \varepsilon_2$ at their shard. Then $\varepsilon_1 < \varepsilon_2$.
+\end{lem}
+\begin{proof}
+We case upon the presence of shard leader failures:
+
+\noindentparagraph{Case 1.} \textit{No failures}.
+A shard leader assigns a timestamp to a committed and coordinated entry as 
+$\epsilon = \max(\epsilon_{\text{pred}} + 1, \epsilon_{\text{shard}})$ and immediately afterwards updates its own value to be 
+$\epsilon_{\text{shard}} = \epsilon + 1$
+Therefore, if $e_1$ is ordered in the shard log before $e_2$, and entries can only be added to the log once they are committed and coordinated, 
+$\epsilon_2 >= \epsilon_{\text{shard}} \geq \epsilon_1 + 1$ or
+$\epsilon_1 < \epsilon_2$
+
+\noindentparagraph{Case 2.} \textit{With failures}.
+The failover procedure splits the entries it has to order into 2 sets - the first set contains entries that can obtain their previously assigned timestamps and the second set contains entries that cannot and hence are assigned new timestamps. By Case 1, we know that the first set will recycle old timestamps that were unique, and they will be added in a sorted order to the log, thus the lemma holds trivially.
+
+We use similar reasoning to Case 1 for showing this lemma holds over entries in the second set. First, the shard timestamp is incremented after assigning the last entry from the first set, thus it is strictly larger than all timestamps from the first set. Lastly, as in Case 1, each entry will be assigned a timestamp that is at least as large as the shard timestamp, and since this timestamp is strictly increasing between all the assignments, it must be the case that $\epsilon_1 < \epsilon_2$.
+
+% The failover protocol uses the Ford-Fulkerson algorithm to find a matching over the bipartite graph, $\mathcal{G}$, of committed-but-not-ordered operations and their timestamp candidates. By lemma \ref{failover_converges}, this procedure converges. Since the set of candidate timestamps in the bipartite graph only contains unique candidates, the matching constructed assigns unique timestamps to all operations during failover. Afterwards, since these operations are sorted by timestamp, it follows that $e_1 <_x e_2 \implies \epsilon_1 < \epsilon_2$.
+
+
+% By line XXX, a shard adds an operation to the log after it is committed and coordinated. By line XXX, when $e_1$ is committed and coordinated, the shard assigns a timestamp for the entry with value $\varepsilon_1$, adds $e_1$ to its log, and update its shard timestamp to be $\varepsilon_{\textit{shard}} = \max(\varepsilon_1, \varepsilon_{\textit{shard}}) + 1$. Because of this, any operation ordered in the log after $e_1$ is assigned a timestamp
+%  $\varepsilon_2 = \max(\varepsilon_{\textit{pred}}+1, \varepsilon_{\textit{shard}})$.
+% It follows that $\varepsilon_1 < \varepsilon_2$.
+
+%Algorithms~\ref{clientprotocol}, ~\ref{shardprotocolmessages},and~\ref{shardprotocolmessages}
+% All operations must send coordination requests to their predecessors, by line 11 of Algorithm~\ref{clientprotocol}. When $e_1$ receives the coordination request sent by the client for $e_2$, $e_1$ cannot respond until it is committed and coordinated, by line 9 of Algorithm~\ref{shardprotocolcoord}.
+
+% By 
+% When a request is committed and coordinated, it sets its timestamp ε = max(εpred+1, εshard).
+% When a request sends a response to a coordination request, it send ε, by line XXX. Thus e1 will send ε1 to e2, where ε1 = max(ε1pred+1, εshard1).
+% When e2 receives a response to its coordination request from e1, it will set its timestamp ε2 = max(ε1+1, εshard2).
+% Trivially, ε1 < ε2 = max(ε1+1, εshard2)
+
+\end{proof}
+
+\begin{lem}
+\label{lemma3}
+Consider a sequence of operations $e_1,...,e_n$ such that the following hold: (0) n > 2(1) successive pairs alternate between belonging to $<_p$ and $<_x$, making no assumption about which edge type is first; (2) the last pair belongs to $\rightarrow$; and (3) $e_1$ and $e_n$ are at the same shard, $X$. Further assume each operation is committed, coordinated, and been assigned timestamp $\varepsilon_1, ..., \varepsilon_n$ at their respective shards. Then $\varepsilon_1 < \varepsilon_n$.
+\end{lem}
+
+\begin{proof}
+We case upon the presence of shard leader failures:
+
+\noindentparagraph{Case 1.} \textit{No failures}.
+By Lemmas \ref{lemma1} and \ref{lemma2}, we know that $\epsilon_1 < \epsilon_{n-1}$. We also know $e_{n-1}$ can't execute until it is \textit{committed} and \textit{coordinated}, which must happen after $e_1$ is \textit{committed} and \textit{coordinated}. If there is a real-time edge between $e_{n-1}$ and $e_n$, and $e_{n-1}$ cannot return to its client until it is \textit{committed} and \textit{coordinated}, then we know $e_{n-1}$ is \textit{committed} and \textit{coordinated} before $e_n$ arrives at shard $X$. Thus, if $e_n$ is at the same shard as $e_1$, $e_n$ must arrive at shard $X$ after $e_n$ is \textit{committed} and \textit{coordinated}.
+
+Using similar reasoning shown in lemma \ref{lemma2}, if $e_1$ is \textit{committed} and \textit{coordinated} and ordered in the shard log before $e_n$, then $\epsilon_1 < \epsilon_n$.
+
+\noindentparagraph{Case 2.} \textit{With failures}.
+Consider (the only interesting case) where shard $X$ fails after $e_1$ and $e_n$ have been \textit{committed} and \textit{coordinated} but not \textit{ordered}. We know that the new leader will contain both $e_1$ and $e_n$ in its set of committed-but-not-ordered entries since they were committed prior to failure and by the quorum intersection property, the new leader will have both of them. The new shard leader will call \texttt{getTimestampChain} for all committed-but-not-ordered entries, including $e_1$ and $e_n$.
+
+It must be the case that $e_1$ had a successor since by construction it precedes another entry, $e_{n-1}$, which has executed and responded to a client. Moreover, since $e_{n-1}$ has executed and responded to its client, and this failover is happening after $e_{n-1}$ has executed and responded to its client, \texttt{getTimestampChain}$(e_1)$ will return a non-NULL value. Thus $e_1$ will be assigned its old timestamp from prior to failover and in the first set of entries processed in the failover protocol.
+
+If $e_n$ receives a NULL value from its call to \texttt{getTimestampChain}, then it is trivially the case that $\epsilon_1 < \epsilon_n$, since it will be processed in the second set of entries, and its timestamp will be at least as large as the shard timestamp which is also strictly larger than the last timestamp assigned from the first set of entries processed during failover.
+
+Otherwise, if $e_n$ receives a non-NULL value from its call to \texttt{getTimestampChain}, then it will be assigned whatever timestamp it had been assigned prior to failover. Since both $e_1$ and $e_n$ can retrieve their old timestamps and recycle them, this case turns into Case 1, where we have already shown this lemma holds.
+
+% By the failover protocol, the new leader will first get the predecessor and successor timestamps for all committed-but-not-ordered entries, including $e_1$ and $e_n$, via calls made to \texttt{getPredecessor} and \texttt{getSuccessor}.
+
+% As in Case 1 (\textit{No failures}), we know the old leader had assigned timestamps to $e_1$ and $e_n$ as
+% $$\epsilon_1 = \max(e_{1\text{pred}} + 1, \text{shard\_ts}) = \max(e_{1\text{pred}} + 1, \text{shard\_ts}_0)$$
+% $$\epsilon_n = \max(e_{1\text{pred}} + 1, \epsilon_1 + 1) \geq \epsilon_1 + 1 > \epsilon_1$$
+
+
+% The values for $\epsilon_1$ and $\epsilon_n$ are also the values $e_1$ and $e_n$ would have sent to their successors prior to failover (if any existed). So we know if \texttt{getSuccessor} returns a non-infinity value for $e_1$ and $e_n$, they will be at least
+
+
+% $$\epsilon_1\_\text{succ} > \epsilon_1 = \max(\epsilon_1\_\text{pred} + 1, \text{shard\_ts})$$
+% $$\epsilon_n\_\text{succ} \geq \max(\epsilon_n\_\text{pred} + 1, \epsilon_1 + 1) \geq \epsilon_1 + 1$$
+
+% We know $e_1$ had a successor since by construction it precedes another entry, $e_{n-1}$, which has executed and responded to a client. Moreover, since $e_{n-1}$ has executed and responded to its client, and this failover is happening after $e_{n-1}$ has executed and responded to its client, \texttt{getSuccessor}$(e_1)$ will return a non-infinity value $v_1 \geq \epsilon_1\_\text{succ}$.
+
+% We don't know if $e_n$ had a successor. If it did not, \texttt{getSuccessor}($e_n$) will return infinity during failure recovery. If it did, it will return a value $v_n = \epsilon_n\_\text{succ} > \epsilon_n \geq \epsilon_1 + 1$.
+
+% After obtaining the predecessor and successor timestamps, the new leader will sort all the committed-but-not-ordered entries by their successor timestamps, $\epsilon_i\_\text{succ}$. We know the following to be true about $e_1$ and $e_n$ after the sort completes:
+
+% If $\epsilon_n\_\text{succ} = \infty$, then it is clear $e_1$ will be sorted before $e_n$. Otherwise, we also know 
+% $$\texttt{getSuccessor}(e_1) = v_1 \geq \epsilon_1\_\text{succ} > \epsilon_1$$
+% $$\texttt{getSuccessor}(e_n) = v_n \geq \epsilon_n\_\text{succ} > \epsilon_1 + 1$$
+% Thus, $e_1$ will still be sorted before $e_n$.
+
+% After the sort, we assign new monotonically increasing timestamps in sorted order, incrementing the shard timestamp between each assignment (as shown in previous lemmas), giving
+% $\epsilon_n >= \max(\epsilon_n\_\text{pred} + 1, \epsilon_1 + 1)$
+% or,
+% $\epsilon_1 < \epsilon_n$
+\end{proof}
+
+\begin{lem}
+\label{lemma5}
+Consider 3 operations, $e_1, e_2, e_3$, such that $e_1 \rightarrow e_2 <_p e_3$. Then $e_1 \rightarrow e_3$.
+\end{lem}
+\begin{proof}
+    If $e_1 \rightarrow e_2$, then by the definition of real time, $\text{resp}(e_1) < \text{inv}(e_2)$. Moreover, if $e_2 <_p e_3$, we also know by the definition of $<_p$ that $\text{inv}(e_2) < \text{inv}(e_3)$. Thus, we have $\text{resp}(e_1) < \text{inv}(e_3) < \text{inv}(e_3)$. But this gives us $e_1 \rightarrow e_3$.
+\end{proof}
+
+Let $<_\psi$ be a partial order defined over pairs of complete operations $e_1, e_2$, as follows:
+\begin{enumerate}
+    \item $e_1 <_x e_2 \implies e_1 <_\psi e_2$
+    \item $e_1 <_p e_2 \implies e_1 <_\psi e_2$
+    \item $e_1 \rightarrow e_2 \implies e_1 <_\psi e_2$, and
+    \item $e_1 <_\psi e_2 \land e_2 <_\psi e_3 \implies e_1 <_\psi e_3$
+\end{enumerate}
+
+\begin{lem}
+\label{lemmamain}
+The partial order $<_\psi$ is acyclic.
+\end{lem}
+\begin{proof}
+We prove the lemma by contradiction, assuming the partial order contains a cycle. Consider a minimum cycle of $n$ operations $e_1,e_2,...,e_n$. Observe that $<_\psi$ is irreflexive by definition, so $n \geq 2$. First, we prove three useful properties of the minimum cycle.
+
+\noindentparagraph{Property 1.} \textit{The cycle contains no consecutive $<_p$ edges.} {Assume for the sake of contradiction there exist two consecutive $<_p$ edges $e_i <_p e_{i+1} <_p e_{i+2}$. By the transitivity of $<_p$, there exists a shorter edge $e_i <_p e_{i+2}$ which is part of the shorter cycle $..., e_i, e_{i+2}, ..., e_i$, a contradiction.}
+
+\noindentparagraph{Property 2.} \textit{The cycle contains no consecutive $<_x$ edges.} {Using similar reasoning as in the above, $e_i <_x e_{i+1} <_x e_{i+2}$ would imply the existence of a shorter cycle that contains the edge $e_i <_x e_{i+2}$, a contradiction.}
+
+\noindentparagraph{Property 3.} \textit{The cycle contains at most one $\rightarrow$ edge.} Assume for the sake of contradiction that the cycle contains two $\rightarrow$ edges, $e_i \rightarrow e_j .... e_k \rightarrow e_l$, where $i < j \leq k < l$, reindexing the cycle if necessary. From the definition of $\rightarrow$, we know $\resp(e_i) < \inv(e_j)$ and $\resp(e_k) < \inv(e_l)$. We also know $\inv(e_l) < \resp(e_i)$, otherwise a shorter cycle would exist containing the edge $e_i \rightarrow e_l$. Similarly, we also know $\inv(e_j) < \resp(e_k)$, otherwise a shorter cycle would exist containing the edge $e_k \rightarrow e_j$. We arrive at a contradiction, since $\resp(e_i) < \inv(e_j) < \resp(e_k) < \inv(e_l) < \resp(e_i)$, which gives $\resp(e_i) < \resp(e_i)$.
+
+By Property 3, there are only two cases to consider:
+
+\noindentparagraph{Case 1.} \textit{There are zero $\rightarrow$ edges in the minimum cycle.} Since $n \geq 2$, and by Properties 1 and 2, at least one edge is a $<_x$ edge and at least one edge is a $<_p$ edge. Also by properties 1 and 2, the cycle must alternate between $<_{x_i}$ and $<_{p_j}$ edges. 
+
+Without loss of generality, re-index the cycle such that $e_1 <_{x_2} e_2 ... <_{p_1} e_1$. By repeated application of Lemmas~\ref{lemma1} and ~\ref{lemma2}, $\varepsilon_1 < \varepsilon_n$. But by Lemma~\ref{lemma2}, $\varepsilon_n < \varepsilon_1$, a contradiction.
+
+\noindentparagraph{Case 2.} \textit{There is one $\rightarrow$ edge in the cycle.}
+
+% Consider separately the cases where $n = 2$ and $n > 2$.
+
+% If $n = 2$, without loss of generality, the cycle is of the form $e_1 <_p e_2 \rightarrow e_1$. By the definitions of $<_p$ and $\rightarrow$, we have $\text{inv}(e_1) < \text{inv}(e_2)$ and $\text{resp}(e_2) < \text{inv}(e_1)$. Since it must be true that $\text{inv}(e_2) < \text{resp}(e_2)$, we have $\text{inv}(e_1) < \text{inv}(e_1)$, a contradiction.
+
+If $n \geq 2$, by Properties 1 and 2 at least one edge is a $<_x$ edge and at least one edge is a $<_p$ edge. Also by properties 1 and 2, the cycle must alternate between $n-1$ $<_{x_i}$ and $<_{p_j}$ edges, and include a single $\rightarrow$ edge. Moreover, by \ref{lemma5}, the edge following the $\rightarrow$ must be $<_x$, otherwise a shorter cycle would exist. 
+
+Without loss of generality, re-index the cycle such that $e_1 ... e_{n-1} \rightarrow e_n <_x e_1$, where the edges between $e_1$ and $e_2$ alternate between $<_p$ and $<_x$, making no assumptions about which appears first. By lemma \ref{lemma3}, $\epsilon_1 < \epsilon_n$. But by lemma \ref{lemma2}, $\epsilon_n < \epsilon_1$, a contradiction.
+\end{proof}
+
+
+\begin{lem}
+    \label{lemmaD14}
+    A topological sort $S$ of $<_\psi$ over complete operations to objects $X$ is in the system sequential specification $\prod_{x \in X}\mathcal{G}_x$.
+\end{lem}
+\begin{proof}
+    Since each operation targets a single object $x \in X$, it suffices to only consider the orders of subsets of operations to each $x$. For a fixed $x$, this order is solely dictated by the partial order $<_x$ in the topological sort of $<_\psi$. Lemma \ref{lemmaD8} shows that the sequence $S_x$ defined by $<_x$ is in $x$'s sequential specification $\mathcal{G}_x$. Since $S$ is a topological sort over $<_\psi$, which by definition generalizes each $<_x$, it follows that the entire sequence $S$ is in $\prod_{x \in X}\mathcal{G}_x$.
+\end{proof}
+
+\begin{thm}
+    \sys{} guarantees \mdllong{}.
+\end{thm}
+
+\begin{proof}
+    Let $\alpha_1$ be a well-formed execution of \sys{}. Extend $\alpha_1$ to $\alpha_2$ by adding a response action for any complete operation $e$ that does not have one in $\alpha_1$.
+
+    Let $S$ be a topological sort of $<_\psi$ on the operations in $\alpha_2$. Lemma \ref{lemmaD14} implies that $S$ is in the system sequential specification. We now show that $S$ satisfies the two remaining properties of \mdllong{}, invocation and real time ordering.
+
+    (1) Consider two operations $e_1$ and $e_2$ such that $e_1 <_p e_2$. By the definition of $<_\psi$, $e_1 <_\psi e_2$, and since $S$ is a topological sort of $<_\psi$, $e_1 <_S e_2$.
+    
+    (2) Consider two operations $e_1$ and $e_2$ such that $e_1 \rightarrow e_2$. By the definition of $<_\psi$, $e_1 <_\psi e_2$, and since $S$ is a topological sort of $<_\psi$, $e_1 <_S e_2$.
+\end{proof}
+
+
+
+% %%%%%%%%%%%%%% CHAT STUFF BELOW %%%%%%%%%%%%%%%%%
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%% 11/5/25 look at this proof%%%%
+
+
+% % \section{IOCL Correctness Proof}
+% % \section*{Appendix D.2 — Proof of IOCL for the Protocol with Reservations, Finals, and Evidence}
+
+% % \paragraph{Model.}
+% % We consider an asynchronous message-passing system with crash-recovery failures. Each shard has a leader and a set of replicas providing crash tolerance via quorum replication.
+% % Clients may issue multiple outstanding operations. Keys are sharded; operations on different keys commute at the shard (no head-of-line among distinct keys), while operations on the same key are serialized.
+
+% % \paragraph{Interface semantics.}
+% % We assume the key–value object semantics are linearizable per key and compositional across keys; operations on disjoint keys commute. The protocol additionally provides a \emph{global} total order used for replication/commit; where operations commute, that order may be used only for replication and need not constrain externally visible semantics.
+
+% % \paragraph{IOCL.}
+% % Invocation-Order Concurrent Linearizability (IOCL) = Linearizability (there exists a total order $<$ of all completed operations that respects real-time: if $op_1$ returns before $op_2$ is invoked, then $op_1 < op_2$) \emph{plus} for any single client, if it issues multiple concurrent operations, those operations must take effect in the client’s invocation order.
+
+% % \subsection*{D.2.1 Protocol recap (notation)}
+% % At each shard we maintain:
+% % \begin{itemize}
+% %   \item A local logical counter $\ShardTS$ used to stamp arrivals (monotone).
+% %   \item For each key $k$, $\lastready{k}$, the largest $\finalTS$ among entries marked ready for key $k$.
+% %   \item A replicated \emph{Reservation} record for each new op: $\RESV(op)$ contains $(op\_id,\;key,\;payload,\;\PredSet(op),\;\arrivalTS(op),\;status=\RESERVED)$.
+% %   \item A replicated \emph{Final} record on commit: $\FINAL(op)$ extends $\RESV(op)$ with $(\assignedTS(op),\;\finalTS(op),\;\Evidence(op),\;status=\FINAL)$ where
+% %   \[
+% %   \Evidence(op) \;=\; \{(op,\assignedTS(op))\}\;\cup\;\{(p,\assignedTS(p))\mid p\in\PredSet(op)\}.
+% %   \]
+% % \end{itemize}
+
+% % Clients send the data request to the destination shard leader; \emph{in parallel} they send coordination requests to predecessor shards named in $\PredSet$.
+% % Each predecessor first returns $\arrivalTS$; after the destination computes $\assignedTS$, predecessors return $\assignedTS$. The destination then computes
+% % \[
+% % \assignedTS(op) \;=\; \max\big(\foldl(\{\arrivalTS(p)\}_{p\in\PredSet(op)}),\; \lastready{key(op)}+1\big),\qquad
+% % \finalTS(op) \;=\; \foldl(\{\assignedTS(p)\}_{p\in\PredSet(op)}\cup\{\assignedTS(op)\})
+% % \]
+% % where $\foldl$ is the deterministic fold:
+% % \[
+% % v\leftarrow L[0];\;\; \text{for }e\in L[1:]\text{ do } v\leftarrow
+% % \begin{cases}
+% % e+1 & \text{if } e>v,\\
+% % v+1 & \text{otherwise.}
+% % \end{cases}
+% % \]
+% % Entries are placed in an \emph{log} by increasing $\finalTS$ with deterministic tie-break $(client\_id, client\_seq)$. An entry becomes \emph{ready} after computing $\finalTS$; the shard may execute it when it reaches the head and no prior entry on the \emph{same key} is unexecuted. Replies are sent after replication of $\FINAL$ and execution.
+
+% % \subsection*{D.2.2 Invariants (safety facts)}
+% % We use the following invariants; each is enforced by the protocol rules.
+
+% % \noindent\textbf{I1 (Reservation before externalization).}
+% % A leader must replicate $\RESV(op)$ (quorum) before advertising any $\arrivalTS(op)$ to other shards.
+
+% % \noindent\textbf{I2 (Monotone timestamps).}
+% % For any entry, the numeric keys are non-decreasing over time:
+% % $\arrivalTS$ is fixed at creation; $\assignedTS$ and $\finalTS$ may only increase during recomputation; $\lastready{k}$ is non-decreasing.
+
+% % \noindent\textbf{I3 (Per-key floor at \assignedTS).}
+% % For any entry $op$ on key $k$,
+% % \[
+% % \assignedTS(op)\;\ge\; \lastready{k}+1.
+% % \]
+
+% % \noindent\textbf{I4 (Two-round completeness).}
+% % Before any shard computes $\finalTS(op)$ it has received $\assignedTS(p)$ for all $p\in \PredSet(op)$.
+
+% % \noindent\textbf{I5 (Evidence / no-use-without-witness).}
+% % If a committed operation $op$ used $\assignedTS(p)$ of some predecessor $p$ in its $\foldl$, then at least one committed record contains that numeric value durably: either $\FINAL(p)$ carries $\assignedTS(p)$, or $\FINAL(op)$ carries $(p,\assignedTS(p))\in \Evidence(op)$.
+
+% % \noindent\textbf{I6 (Ready stability).}
+% % Once an entry is marked ready with $\finalTS=F$, no later arriving entry can be inserted in the log before it. (Intuition: any later entry must compute $\assignedTS\ge \lastready{k}+1\ge F+1$ on the same key; and on other keys, $\foldl$ with non-decreasing predecessors cannot produce a key $<F$ if the ready entry participates as predecessor. Formalized in Lemma~\ref{lem:ready-stable}.)
+
+% % \noindent\textbf{I7 (Deterministic total order).}
+% % The log is a total order by the key $(\finalTS,\;client\_id,\;client\_seq)$.
+
+% % \subsection*{D.2.3 Lemmas}
+
+% % \begin{lemma}[Fold monotonicity]\label{lem:fold-monotone}
+% % Let $A\subseteq\mathbb{N}$ and $v=\foldl(A)$.
+% % If $A\subseteq B$ and $B$ extends $A$ by any multiset of elements, then $\foldl(B)\ge v$.
+% % Moreover, replacing any element of $A$ by a larger value does not decrease the fold.
+% % \end{lemma}
+% % \begin{proof}
+% % Immediate from the fold definition: each step either takes $e+1$ with $e>v$ or increments $v$ by $1$; hence adding elements or increasing any element can never reduce the result.
+% % \end{proof}
+
+% % \begin{lemma}[Assigned dominates floor]\label{lem:assigned-floor}
+% % For any $op$ on key $k$, $\assignedTS(op)\ge \lastready{k}+1$ (I3). Consequently, $\finalTS(op)\ge \assignedTS(op)\ge \lastready{k}+1$ by Lemma~\ref{lem:fold-monotone}.
+% % \end{lemma}
+
+% % \begin{lemma}[Ready stability]\label{lem:ready-stable}
+% % If an entry $x$ is marked ready with $\finalTS(x)=F$, then no subsequently arriving entry $y$ can be placed before $x$ in the log.
+% % \end{lemma}
+% % \begin{proof}
+% % Case 1: $key(y)=key(x)$. By Lemma~\ref{lem:assigned-floor}, $\assignedTS(y)\ge \lastready{key(x)}+1\ge F+1$; therefore $\finalTS(y)\ge \assignedTS(y)\ge F+1$, so $y$ cannot precede $x$.
+
+% % Case 2: $key(y)\neq key(x)$. If $x\in\PredSet(y)$ then by Lemma~\ref{lem:fold-monotone}, $\finalTS(y)\ge \finalTS(x)=F$. If $x\not\in\PredSet(y)$, then $y$’s predecessors are disjoint from $x$, but all predecessor numeric values are non-decreasing (I2) and the fold is monotone; thus $\finalTS(y)\ge 0$ and the deterministic tie-break (I7) forbids reordering a ready entry backwards ex post. In either case, $y$ cannot overtake $x$ after $x$ is ready.
+% % \end{proof}
+
+% % \begin{lemma}[Acyclicity of the execution graph]\label{lem:acyclic}
+% % Define a directed graph $G$ whose nodes are committed operations and edges are:
+% % (i) per-client invocation edges: if a client issues $o_1$ then $o_2$ with $o_1$ preceding $o_2$ in the client’s invocation order, add $o_1\to o_2$;
+% % (ii) per-shard log edges: if $o_1$ precedes $o_2$ in the log on the same shard, add $o_1\to o_2$;
+% % (iii) predecessor edges: if $p\in\PredSet(o)$, add $p\to o$.
+% % Then $G$ is acyclic.
+% % \end{lemma}
+% % \begin{proof}
+% % Assign each node $o$ the numeric key $\kappa(o):=(\finalTS(o), client\_id(o), client\_seq(o))$.
+% % By construction (I7), per-shard log edges strictly increase $\kappa$.
+% % By Lemma~\ref{lem:fold-monotone}, for any predecessor $p\in\PredSet(o)$, $\finalTS(o)\ge \finalTS(p)$, and if equality holds the tie-break ensures $\kappa(o)>\kappa(p)$; hence predecessor edges strictly increase $\kappa$.
+% % Per-client invocation edges are included in $\PredSet$ by construction of the predecessor sets (each later invocation adds the earlier outstanding ones), so they are a subcase of predecessor edges.
+% % Therefore every edge in $G$ strictly increases $\kappa$, so $G$ contains no directed cycle.
+% % \end{proof}
+
+% % \begin{lemma}[Linearization order exists]\label{lem:lin-order}
+% % Sorting all committed operations by the total key $\kappa(o)=(\finalTS, client\_id, client\_seq)$ yields a total order that extends all edges in $G$ of Lemma~\ref{lem:acyclic}.
+% % \end{lemma}
+% % \begin{proof}
+% % Immediate from I7 and the proof of Lemma~\ref{lem:acyclic}.
+% % \end{proof}
+
+% % \begin{lemma}[Real-time order respected]\label{lem:realtime}
+% % If $op_1$ returns to its client before $op_2$ is invoked (real-time order), then $\kappa(op_1) < \kappa(op_2)$.
+% % \end{lemma}
+% % \begin{proof}
+% % By the protocol, a reply is sent only \emph{after} $\FINAL(op_1)$ is replicated and the entry is executed at its shard. Thus $op_1$ already appears in the log with fixed $\finalTS(op_1)$.
+% % When $op_2$ is later invoked, either (a) $op_2$’s key equals $op_1$’s key, in which case by Lemma~\ref{lem:assigned-floor} and Ready stability $\finalTS(op_2)\ge \lastready{key}+1 > \finalTS(op_1)$, hence $\kappa(op_2)>\kappa(op_1)$; or
+% % (b) the keys differ, in which case real-time imposes no per-key semantic constraint, but the global total order $\kappa$ is already fixed for $op_1$ and $\finalTS(op_2)$ is computed using only non-decreasing predecessor numbers (I2, I4). If $\finalTS(op_2)=\finalTS(op_1)$, the deterministic tie-break orders $op_1$ before $op_2$ because $op_1$ is already committed/executed and $op_2$ arrives later (ties resolved by $(client\_id,client\_seq)$, which by interface convention is fresh for the later operation). Thus $\kappa(op_1) < \kappa(op_2)$.
+% % \end{proof}
+
+% % \paragraph{Remark.}
+% % The above leverages compositional linearizability: across \emph{disjoint keys} the real-time constraint does not impose observable state dependencies; our $\kappa$ still yields a single total order that never places a later reply before an earlier commit.
+
+% % \subsection*{D.2.4 Correctness under failures (recovery)}
+% % We argue that failures do not break the properties above.
+
+% % \begin{lemma}[Durability of used timestamps]\label{lem:witness}
+% % If a committed operation $o$ used $\assignedTS(p)$ in its fold, then after any crash, the system can recover $\assignedTS(p)$.
+% % \end{lemma}
+% % \begin{proof}
+% % By I5 (no-use-without-witness), either $\FINAL(p)$ carries $\assignedTS(p)$ or some committed successor $\FINAL(o)$ carries $(p,\assignedTS(p))\in\Evidence(o)$, both quorum-replicated. Hence recovery can read it.
+% % \end{proof}
+
+% % \begin{lemma}[Reservation completeness]\label{lem:reservation}
+% % If an operation $o$ ever externalized any $\arrivalTS$ or $\assignedTS$, then after any crash a new leader will find a replicated $\RESV(o)$.
+% % \end{lemma}
+% % \begin{proof}
+% % By I1, the leader replicates $\RESV(o)$ before any externalization. Quorum replication ensures it survives any $f$ crashes.
+% % \end{proof}
+
+% % \begin{lemma}[Recovery preserves folds]\label{lem:recovery-fold}
+% % During recovery, for any reserved operation $r$, the recovered set $\{ \assignedTS(p)\mid p\in\PredSet(r)\}$ equals the set used online up to monotone increases, and the recomputed $\finalTS(r)$ is $\ge$ the online $\finalTS$.
+% % \end{lemma}
+% % \begin{proof}
+% % By Lemma~\ref{lem:witness}, every $\assignedTS(p)$ that ever influenced any committed successor is recoverable from some $\Evidence$. For predecessors that never influenced any committed successor, recovery re-runs the two-round protocol (arrival, then assigned) or promotes their Reservations first, yielding values $\ge$ their online counterparts by I2. By Lemma~\ref{lem:fold-monotone}, recomputed folds cannot decrease, hence $\finalTS$ is preserved or increased.
+% % \end{proof}
+
+% % \begin{lemma}[Ordered log is preserved under recovery]\label{lem:recovery-order}
+% % After recovery, placing all Finals and promoted Reservations by the total key $\kappa$ yields the same (or a later) position for every previously committed operation and maintains acyclicity of $G$.
+% % \end{lemma}
+% % \begin{proof}
+% % Previously committed Finals keep their $\finalTS$ and $\Evidence$; by Lemma~\ref{lem:recovery-fold} any promoted entries receive $\finalTS$ not smaller than their online values. Thus re-inserting by $\kappa$ cannot move any committed entry earlier relative to others. Acyclicity then follows from the same argument as in Lemma~\ref{lem:acyclic}.
+% % \end{proof}
+
+% % \subsection*{D.2.5 Main theorem}
+
+% % \begin{theorem}[IOCL]\label{thm:iocl}
+% % The protocol with Reservations, Finals, and Evidence satisfies Invocation-Order Concurrent Linearizability under crash-recovery failures.
+% % \end{theorem}
+% % \begin{proof}
+% % Define the linearization order to be the total order by $\kappa=(\finalTS, client\_id, client\_seq)$ over all committed operations (Lemma~\ref{lem:lin-order}). This order extends per-client invocation edges and shard log edges and is acyclic (Lemma~\ref{lem:acyclic}). It respects real-time (Lemma~\ref{lem:realtime}). Under failures, Reservations ensure all in-flight operations are visible to the new leader (Lemma~\ref{lem:reservation}); Evidence ensures all used predecessor timestamps are durable (Lemma~\ref{lem:witness}); recomputation does not decrease any $\finalTS$ (Lemma~\ref{lem:recovery-fold}); re-insertion by $\kappa$ preserves order and acyclicity (Lemma~\ref{lem:recovery-order}). Hence the linearization order exists and satisfies Linearizability, and by construction per-client concurrent invocations are ordered in invocation order (they are included in $\PredSet$), establishing IOCL.
+% % \end{proof}
+
+% % \subsection*{D.2.6 Tie-break and commutativity notes}
+% % Deterministic tie-breaking $(client\_id, client\_seq)$ ensures a total order even when $\finalTS$ coincides. The shard executes ready entries at head of log subject to the commutativity rule: an entry is stalled only by prior unexecuted entries on the same key; otherwise it may execute immediately. This affects \emph{liveness} but not safety; $\kappa$ remains a valid linearization order.
+
+% % \subsection*{D.2.7 Assumptions recap}
+% % For completeness, we rely on: quorum replication; deterministic $\foldl$; per-key commutativity; two-round completeness (I4); Reservation before externalization (I1); Evidence no-use-without-witness (I5); and deterministic tie-break.
+
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%% 11/5/25 lemmas for 1-round exchange %%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \begin{lemma}[Arrivals-only IOCL safety under transitive within-client predecessors]
+% \label{lem:arrivals_only_iocl}
+% Assume:
+% \begin{enumerate}
+% \item (\textbf{Reservations}) Each operation $o$ is replicated as a Reservation before any externalization.
+% \item (\textbf{NOT\_READY pinning}) Upon arrival, $o$ is inserted into the shard’s log with $\mathrm{arrival}(o)$ and marked \textsc{NotReady}. Entries marked \textsc{NotReady} cannot be overtaken by later entries on the \emph{same} key (the shard executes only \textsc{Ready} entries at head-of-log; $\lastready{k}$ never advances past a \textsc{NotReady} entry on $k$).
+% \item (\textbf{Within-client transitive snapshot}) For each operation $o$ of a client $C$, the client supplies a fixed predecessor set $\PredSet^\star(o)$ equal to the transitive closure of $C$’s earlier outstanding operations at the time $o$ is invoked. 
+% \item (\textbf{Final from arrivals}) The shard computes
+% \[
+% \final(o) \;=\; \max\!\big(\foldl(\{\arrival(p)\mid p\in\PredSet^\star(o)\}),\;\arrival(o),\;\lastready{key(o)}{+}1\big),
+% \]
+% then marks $o$ \textsc{Ready} and places it by $(\final(o),\text{tiebreak})$.
+% \end{enumerate}
+% Then the total order by $(\final,\text{tiebreak})$ is a linearization order and, for any two operations $x,y$ of the same client with $x$ invoked before $y$ (possibly concurrently), we have $\final(y)\ge \final(x)$, hence the order respects invocation order. Therefore the protocol satisfies IOCL.
+% \end{lemma}
+
+% \begin{proof}[Proof sketch]
+% Let $\kappa(o)=(\final(o),\text{tiebreak})$.
+
+% (\emph{Acyclicity / total order}) By definition $\kappa$ yields a total order. For any shard-log edge or per-key head-of-line constraint, \textsc{NotReady} pinning prevents later same-key arrivals from overtaking an earlier entry, and \textsc{Ready} entries execute in log order, so edges are consistent with nondecreasing $\final$. For cross-key operations that commute, $\kappa$ fixes a total order without violating semantics.
+
+% (\emph{Invocation edges}) Fix a client $C$ and two of its ops $x \prec_C y$ (invocation order). By construction $x\in \PredSet^\star(y)$ or $x=y$. The fold is monotone, and $\arrival(x)$ appears in the multiset folded for $y$, so 
+% \[
+% \foldl(\{\arrival(p):p\in\PredSet^\star(y)\}) \;\ge\; \arrival(x).
+% \]
+% Also $\final(x)\ge \arrival(x)$ (own-arrival max) and, if $key(x)=key(y)$, the $\lastready{key(y)}{+}1$ term enforces $\final(y)\ge \final(x){+}1$ once $x$ is \textsc{Ready}. Finally, \textsc{NotReady} pinning forbids any same-key newcomer from placing before $x$ while $x$ is pending. Thus in all cases $\final(y)\ge \final(x)$, and ties are broken deterministically, yielding $\kappa(x)<\kappa(y)$.
+
+% (\emph{Real time}) Replies are sent only after commit+execution at head-of-log. If $o_1$ returns before $o_2$ is invoked, then $o_1$ already sits in the log; any later $o_2$ computes $\final(o_2)\ge \arrival(o_2)\ge \arrival(o_1)$, and for same-key the $\lastready$ term pushes strictly past. Hence $\kappa(o_1)<\kappa(o_2)$.
+
+% Crash safety follows from Reservations (ops are recoverable) and the fact arrivals are stable and predecessor IDs are carried in Reservations; recomputation replays the same fold or a superset, which by monotonicity cannot decrease $\final$.
+% \end{proof}
+
+
+
+% \begin{lemma}[Execution-as-Order Linearization under Per-Key Heads]
+% \label{lem:exec_order_linearization}
+% Assume the shard executes entries as follows:
+% (i) An operation $o$ is inserted on arrival with $\arrival(o)$ and marked \textsc{NotReady}; later it is marked \textsc{Ready} after computing $\final(o)$.
+% (ii) The executor repeatedly picks any \textsc{Ready} entry that is the \emph{head of its key's subqueue} (no earlier unexecuted entry on the same key), executes it, and replies to the client only after execution is durably replicated.
+% (iii) Operations on different keys \emph{commute} (object semantics are per-key linearizable and compositional).
+% (iv) For each client $C$, a successor $y$ includes a prefix-closed within-client predecessor set $\PredSet^\*(y)$, and $y$ is marked \textsc{Ready} only after all $p \in \PredSet^\*(y)$ have been inserted and their $\arrival(p)$ values have been folded into $\final(y)$ (arrivals-only variant) or after $y$ receives already-bumped predecessor scalars (two-ACK variant).
+% (v) Real-time responses are sent only after execution.
+
+% Then the \emph{execution order} $\prec_{\mathrm{exec}}$ (the order in which operations are executed at their shards) is a linearization order that satisfies IOCL: it is a total order over completed operations that
+% (a) respects per-key object semantics,
+% (b) respects real time, and
+% (c) for any client $C$, respects $C$'s invocation order (including concurrent invocations).
+% \end{lemma}
+
+% \begin{proof}[Proof sketch]
+% \emph{Per-key safety.} By (ii), the executor never executes an operation on key $k$ while there exists an earlier unexecuted entry for $k$. Hence the per-key projection of $\prec_{\mathrm{exec}}$ is FIFO and thus linearizable for the per-key object.
+
+% \emph{Cross-key safety.} By (iii), operations on different keys commute; executing them in any interleaving consistent with per-key heads yields a state reachable by some serial order. Therefore $\prec_{\mathrm{exec}}$ yields a valid total order over completed operations.
+
+% \emph{Invocation order (IOCL part).} Let $x \prec_C y$ be two operations of the same client in invocation order. By (iv) the shard marks $y$ \textsc{Ready} only after $x$ has been inserted and accounted for in $y$'s timestamp computation (arrivals-only via $\PredSet^\*$ or already-bumped scalars). While $x$ remains unexecuted, it sits at or before the head of its key’s subqueue; thus (ii) forbids executing $y$ on the same key before $x$. If $key(x)\neq key(y)$, then (ii) imposes no cross-key constraint, but IOCL only requires that \emph{effects} occur in invocation order for the same client; because the commit point is execution and $x$ is inserted and considered before $y$ is marked \textsc{Ready}, any externally visible program-order dependence is preserved. Thus $x \prec_{\mathrm{exec}} y$ holds when required by IOCL.
+
+% \emph{Real time.} By (v) replies occur only after execution. If $o_1$ returns before $o_2$ is invoked, then $o_1$ has executed already and hence precedes $o_2$ in $\prec_{\mathrm{exec}}$. Therefore the execution order respects real time.
+
+% Combining the above, $\prec_{\mathrm{exec}}$ is a linearization order satisfying IOCL.
+% \end{proof}
+
+
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% some more proof stuff %%%%%%%%
+% \section{Failure Model and Recovery (Arrivals-Only, No Durable-Arrival Index)}
+% \label{sec:recovery-no-arrival-index}
+
+% \paragraph{Failure model.}
+% Crash faults, no Byzantine behavior. A quorum of replicas per shard provides durable storage. Messages may be delayed, duplicated, or lost, but not corrupted. Clients may retry with the same $(\mathit{client\_id}, \mathit{seqno})$; servers deduplicate and cache replies.
+
+% \paragraph{Objects and state.}
+% Each shard maintains:
+% \begin{itemize}
+%   \item An \emph{unordered bag} of \emph{Reservations}: durable tuples
+%   $(\mathit{op\_id}, \mathit{key}, \mathit{op\_body}, \mathit{client\_id}, \mathit{seqno}, \PredSet^\*(\cdot))$.
+%   \item A volatile per-key log; entries are inserted on arrival with $\arrival(\cdot)$ and marked \textsc{NotReady} until finalization.
+%   \item A durable set of \emph{Finals}: $(\mathit{op\_id}, \final(\cdot), \mathit{chain})$, where
+%   $\mathit{chain}$ is the list of predecessor arrivals actually folded
+%   (timestamp chain). Replies are sent only after Final replication and execution; servers cache $(\mathit{client\_id}, \mathit{seqno}) \mapsto \mathit{result}$.
+% \end{itemize}
+
+% \paragraph{Key safety rule (Insert-before-Advertise).}
+% A shard must insert an operation into its per-key log (\textsc{NotReady}) \emph{before} it advertises the operation's $\arrival$ to any successors. (No durable arrival index is required.)
+
+% \subsection{Protocol Under Failures}
+% \label{sec:proto-failure}
+
+% \begin{enumerate}[leftmargin=*]
+%   \item \textbf{Reservation (unordered, durable).}
+%   Upon request arrival, the leader writes a Reservation to a quorum.
+%   No timestamps are assigned yet.
+%   \item \textbf{Assign \& insert (start HoL).}
+%   After Reservation is durable, assign $\arrival := \ShardTS$; increment $\ShardTS$; insert the entry in the per-key log as \textsc{NotReady}. \emph{Head-of-line blocking begins here.}
+%   \item \textbf{Advertise arrivals (one outward 1-way).}
+%   Send $\arrival$ to each successor in $\PredSet^\*(\cdot)$
+%   (or skip if the client supplied a predecessor $\final$ seed).
+%   \item \textbf{Finalize locally.}
+%   When predecessor arrivals are collected (plus any seeds),
+%   compute $\final := \max(\foldl(\text{pred-arrivals/seeds}), \arrival \,[,\,\text{per-key floor}])$; mark \textsc{Ready} and (re)order if needed.
+%   \item \textbf{Commit, execute, reply.}
+%   At per-key head and \textsc{Ready}, replicate a \emph{Final}
+%   (including the timestamp chain used), execute, and reply to the client (dedup via $(\mathit{client\_id},\mathit{seqno})$).
+% \end{enumerate}
+
+% \subsection{Recovery}
+% \label{sec:recovery-proc}
+
+% After leader failover:
+% \begin{enumerate}[leftmargin=*]
+%   \item \textbf{Load durable state.} Gather Reservations and Finals from a quorum. Rebuild $\ShardTS$ and any per-key floors from Finals.
+%   \item \textbf{Per-client suffix policy.} For each client, if an operation with sequence $s$ is \emph{unrecoverable} (no Reservation present) while some successor operation $>s$ is present or committed, then—by policy—fail the entire suffix $\{s+1, s+2, \dots\}$ (suffix-enclosed failures).
+%   \item \textbf{Complete in-flight operations.}
+%     For each Reservation without a Final:
+%     \begin{enumerate}
+%       \item \emph{If any successor ever used this op's arrival}: recover that $\arrival$ from the successor's \emph{Final}'s timestamp chain and reinsert the op with the same $\arrival$; gather predecessors' arrivals (from Reservations or chains) and recompute $\final$; mark \textsc{Ready}.
+%       \item \emph{If no successor ever used this op's arrival}: choose a fresh $\arrival := \ShardTS$; $\ShardTS{+}{+}$; gather predecessors' arrivals or seeds; compute $\final$; mark \textsc{Ready}.
+%     \end{enumerate}
+%   \item \textbf{Commit and execute.} Execute per-key in nondecreasing $\final$; replicate Finals if missing; resend cached replies (clients dedup).
+% \end{enumerate}
+
+% \subsection{Correctness}
+% \label{sec:correctness-iocl-failure}
+
+% \begin{lemma}[IOCL under Failures with Insert-before-Advertise]
+% \label{lem:iocl-failure}
+% Assume: (i) crash faults only; (ii) Reservations are quorum-durable before step~2;
+% (iii) Insert-before-Advertise holds; (iv) each Final contains the predecessor arrivals actually folded (timestamp chain); (v) for each client, $\PredSet^\*(\cdot)$ is prefix-closed over its outstanding invocations; (vi) execution replies occur only after Final replication and execution. Then the protocol in \S\ref{sec:proto-failure} with recovery in \S\ref{sec:recovery-proc} linearizes completed operations and satisfies IOCL. Moreover, suffix-enclosed failures hold: if an op with seqno $s$ cannot be recovered, all ops with seqno $>s$ for that client fail.
+% \end{lemma}
+
+% \begin{proof}[Proof sketch]
+% \emph{Linearizability.} Replies happen after commit+execute. Recovery either reconstructs the exact arrivals used by any successor (via timestamp chains) or picks fresh arrivals when no successor depended on them; recomputation never decreases a predecessor used in a chain, hence $\final$ values do not regress across failover. Executed order per key is nondecreasing in $\final$.
+
+% \emph{Invocation order.} For a client $C$, $\PredSet^\*$ ensures each successor includes all earlier outstanding invocations (transitively). Due to Insert-before-Advertise, a predecessor is inserted (\textsc{NotReady}) before its $\arrival$ is sent, so successors cannot safely finalize ahead of an absent predecessor in the local key order. Finalization folds the predecessor arrivals; execution per key respects that order, hence effects occur in $C$'s invocation order.
+
+% \emph{Real time.} If $o_1$ responds before $o_2$ is invoked, then $o_1$ executed prior to $o_2$'s execution by construction; recovery does not reorder completed replies.
+
+% \emph{Suffix-enclosed failures.} If a predecessor was used by any committed successor, its $\arrival$ appears in some Final chain and is therefore recoverable; otherwise no visible effect depends on it and the shard may re-admit it with a fresh arrival or fail it. If an op is truly unrecoverable (Reservation missing), we fail the client's suffix by policy, preventing any successor from committing. Hence IOCL and the suffix condition hold.
+% \end{proof}
+
+% \subsection{Zero-Predecessor Operations}
+% \label{sec:zeropred}
+
+% No special regime is required. A zero-predecessor request follows the same steps:
+% \begin{enumerate}[leftmargin=*]
+%   \item Replicate a Reservation (unordered).
+%   \item Assign $\arrival := \ShardTS$; $\ShardTS{+}{+}$; insert as \textsc{NotReady}.
+%   \item Since $\PredSet^\*=\emptyset$, compute $\final := \arrival$; mark \textsc{Ready}.
+%   \item Optionally advertise $\final$ (which equals $\arrival$) to successors (it will appear in their chains if used).
+%   \item Commit, execute, reply.
+% \end{enumerate}
+% This preserves recoverability: if the op's $\final$ (=$\arrival$) is ever externalized, some successor's Final carries it in its chain; otherwise the shard can safely reassign a fresh $\arrival$ on recovery.
+
+% \paragraph{Why keep two outward rounds.}
+% Eliminating the arrivals round would force successors to stall behind the ``zeroth'' request until it reaches the head and commits (so they can learn its timestamp), inflating end-to-end latency and harming concurrency. The two 1-way rounds (arrivals then finals) allow successors to compute and pin their $\final$ without waiting for the predecessor to reach the head, while Insert-before-Advertise ensures the necessary head-of-line safety.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%% Current 1-ACK exchange SKETCH ?!?!?!? %%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \section*{D. Proof of Correctness}
+% We now sketch why the protocol in Section~\ref{leaderprotocol} provides
+% \textbf{Invocation-Order Concurrent Linearizability (IOCL)} under crash failures.
+
+% \subsection*{Definitions}
+% \begin{itemize}
+%     \item A history $H$ is \emph{linearizable} if there exists a total order $<_{L}$ over all operations that:
+%     (1) respects real-time order ($op_i$ completes before $op_j$ begins $\Rightarrow op_i <_{L} op_j$), and
+%     (2) each operation’s response matches its specification.
+%     \item IOCL extends linearizability by requiring that, for each client $c$, its operations appear in $<_{L}$ in the same order as their invocation order.
+% \end{itemize}
+
+% \subsection*{System Model}
+% The system is composed of shard leaders and replicas.
+% Leaders are responsible for assigning timestamps to operations.
+% Clients track their own invocation order and send explicit coordination requests (\texttt{SubmitCR}) to the shards of each predecessor.
+% Replicas fail by crashing but do not exhibit Byzantine behavior.
+
+% \subsection*{Invariants}
+% \begin{enumerate}[label=(I\arabic*)]
+%     \item (\textbf{Durable Operations}) Every request that is advertised to successors has its operation data durably replicated in the \emph{unordered bag}.
+%     \item (\textbf{Insert-before-advertise}) A leader inserts an operation into its local log (marked \texttt{NOT\_READY}) before sending its arrival timestamp to any successor.
+%     \item (\textbf{Final Evidence}) Every committed operation replicates a \emph{Final record} containing $(final\_TS, [pred\_arrivals])$. Thus, if a successor externalizes its effects, at least one durable record exists containing each predecessor’s arrival timestamp.
+%     \item (\textbf{Head-of-line blocking}) A log entry must reach \texttt{READY} before execution, and execution proceeds in increasing order of $final\_TS$ per key.
+% \end{enumerate}
+
+% \subsection*{Lemma 1 (Crash Safety)}
+% If a shard leader fails after advertising an operation’s arrival timestamp,
+% the new leader will recover a consistent $\textit{arrival\_TS}$ for that operation.
+
+% \textbf{Proof.}
+% If the operation was advertised, its unordered entry was already durably replicated (by I1).
+% If any successor used its arrival timestamp, then by I3, the successor’s Final record contains that arrival in its timestamp chain.  
+% Thus, the recovery procedure can reconstruct the original arrival.  
+% If no successor used it, no visible effect depends on that timestamp, and recovery can safely assign a fresh arrival timestamp. $\square$
+
+% \subsection*{Lemma 2 (Monotonicity of Timestamps)}
+% For any two operations $o_1$ and $o_2$ on the same key,
+% if $o_1$ is inserted before $o_2$ in the log, then
+% $final\_TS(o_1) \le final\_TS(o_2)$.
+
+% \textbf{Proof.}
+% By I4, no operation may execute until all earlier arrivals in its key’s log are marked READY.
+% When $o_1$ reaches READY, the shard sets $ShardTS := final\_TS(o_1)+1$.
+% Hence all subsequent arrivals receive timestamps $\ge ShardTS$,
+% ensuring monotonicity of both arrival and final timestamps. $\square$
+
+% \subsection*{Lemma 3 (No Cycles)}
+% The execution graph $G=(V,E)$, where $E$ contains:
+% (1) invocation-order edges within a client,
+% (2) shard-order edges within each key,
+% and (3) real-time edges across clients,
+% is acyclic.
+
+% \textbf{Proof.}
+% (1) Invocation edges are total within each client and consistent by construction of $\textit{PredSet*}$.
+% (2) Shard-order edges correspond to increasing $final\_TS$, which are monotonic by Lemma 2.
+% (3) Real-time edges correspond to timestamp order because successors include all predecessor arrivals in their foldl.  
+% Together, these define a partial order consistent with $<_{L}$ and admit a topological sort. $\square$
+
+% \subsection*{Theorem (IOCL Correctness)}
+% The protocol ensures that every execution is \emph{Invocation-Order Concurrently Linearizable}.
+
+% \textbf{Proof Sketch.}
+% Consider any well-formed history $H$.  
+% Each operation $op_i$ is associated with a unique $final\_TS(op_i)$.
+% Let $<_{L}$ be the total order of operations by increasing $final\_TS$ (breaking ties arbitrarily across independent keys).  
+% By Lemma 2, $<_{L}$ is total and consistent with per-key execution.
+% By Lemma 3, no cycle exists across invocation or real-time edges.  
+% Therefore, $<_{L}$ is a valid linearization order.
+% Moreover, since the client library enforces prefix-closed $\textit{PredSet*}$, all client-invoked operations appear in $<_{L}$ in their invocation order. $\square$
+
+% \subsection*{Failure Safety}
+% After a crash, recovery guarantees:
+% (1) all advertised arrivals are recoverable (Lemma 1),
+% (2) no operation is externally visible without its durable arrival in some successor’s Final chain, and
+% (3) suffix-enclosed failure semantics: if a predecessor fails unrecoverably, all its successors also fail.
+% Therefore, the recovered state preserves IOCL.
+
+% \textbf{Conclusion.}
+% Because every committed operation’s Final is durably replicated before client response,  
+% and because arrivals are recoverable from successors’ evidence,  
+% the system guarantees a total order consistent with real-time and invocation order, even under failures.
+
+
+
+
+
+
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%% Current 1-ACK exchange FINAL !?!?!?!? %%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \section*{D. Proof of Correctness}
+
+% We prove that the protocol described in Section~\ref{leaderprotocol} satisfies
+% \textbf{Invocation-Order Concurrent Linearizability (IOCL)}
+% under crash failures and suffix-enclosed failure semantics.
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection*{Definitions and Model}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \paragraph{Linearizability.}
+% A history $H$ of operations is \emph{linearizable} if there exists a total order
+% $<_L$ on all completed operations such that:
+% (1)~$<_L$ respects real-time order (if $op_i$ completes before $op_j$ begins, then
+% $op_i <_L op_j$), and
+% (2)~each operation’s result in $<_L$ is consistent with the sequential specification of the object.
+
+% \paragraph{Invocation Order.}
+% For each client $c$, its operations have an invocation order $<_I$ determined by
+% program order.  We require that the final linearization $<_L$ extend $<_I$ for each client.
+
+% \paragraph{IOCL.}
+% A history $H$ is \emph{Invocation-Order Concurrently Linearizable (IOCL)} if there
+% exists a total order $<_L$ that satisfies:
+% \begin{enumerate}
+%     \item $<_L$ extends real-time order.
+%     \item $<_L$ extends each client’s invocation order $<_I$.
+%     \item The result of each operation in $<_L$ matches its specification.
+% \end{enumerate}
+
+% \paragraph{System Model.}
+% Each shard consists of a leader and a set of replicas.  A leader assigns timestamps
+% to operations, maintains an \emph{unordered bag} of durably replicated operations,
+% and an \emph{log} of sorted operations.  Each leader maintains a scalar
+% $ShardTS$ used to assign monotonically increasing timestamps.
+% Failures are crash failures only; network is reliable after bounded delay.
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection*{Protocol Summary (for Reference)}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% 1.~On request arrival, the leader replicates the operation (with metadata and
+% predecessor list) in an unordered bag.  
+% 2.~After replication, the leader assigns an arrival timestamp
+% $entry.arrival\_TS = ShardTS$ and increments $ShardTS$.  
+% 3.~The entry is inserted into the log (marked NOT\_READY) and the
+% arrival timestamp is sent to all successors.  
+% 4.~Once the entry receives arrival timestamps from all predecessors, it computes
+% $final\_TS = \max(\foldl(pred\_arrivals), arrival\_TS)$, is re-inserted into the log
+% if necessary, marked READY, and replicated with its final record.  
+% 5.~READY entries execute in log order per key.  
+% 6.~Clients observe responses only after the final record is replicated.
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection*{Invariants}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \begin{enumerate}[label=(I\arabic*)]
+%     \item \textbf{Durable Before Advertise:}
+%     No operation advertises its $arrival\_TS$ before its unordered replica
+%     (operation data and predecessor list) is durably stored on a quorum.
+
+%     \item \textbf{Monotonic Timestamp Assignment:}
+%     Each shard’s $ShardTS$ is monotonically increasing.
+%     If operation $o_1$ receives a smaller arrival timestamp than $o_2$,
+%     then $arrival\_TS(o_1) < arrival\_TS(o_2)$.
+
+%     \item \textbf{Head-of-Line Discipline:}
+%     For each key, execution proceeds in increasing order of $final\_TS$;
+%     a NOT\_READY entry blocks all later entries on that key.
+
+%     \item \textbf{Final Evidence:}
+%     When an entry executes, a Final record $(final\_TS, [pred\_arrivals])$
+%     is durably replicated to all replicas.
+%     Therefore, any successor externalizing this operation’s effects
+%     carries its arrival timestamp as evidence.
+
+%     \item \textbf{Failure Containment (Suffix Enclosure):}
+%     If any operation $o_i$ fails permanently, all its successors in
+%     invocation order also fail.
+% \end{enumerate}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection*{Lemma 1 — Arrival Recovery}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \textbf{Statement.}
+% If a leader crashes after advertising an operation’s $arrival\_TS$,
+% the new leader can deterministically recover that same $arrival\_TS$.
+
+% \textbf{Proof.}
+% By (I1), the operation’s unordered replica was durably stored
+% before advertisement.
+% If any successor used that arrival in its foldl computation, then by (I4)
+% the successor’s Final record contains it in its timestamp chain.
+% The recovery procedure inspects successors’ evidence sets,
+% thus retrieving the exact advertised arrival timestamp.
+% If no successor used it, the arrival is unreferenced and can be safely reassigned
+% without affecting external visibility. $\square$
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection*{Lemma 2 — Timestamp Monotonicity}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \textbf{Statement.}
+% For any two operations $o_1$ and $o_2$ on the same key,
+% if $o_1$ is inserted before $o_2$ in the log,
+% then $final\_TS(o_1) \le final\_TS(o_2)$.
+
+% \textbf{Proof.}
+% When $o_1$ is marked READY, its final timestamp $f_1$ is computed and
+% $ShardTS$ is set to $f_1+1$.
+% Any subsequent arrival on that shard receives
+% $arrival\_TS \ge ShardTS$, and therefore
+% $final\_TS(o_2) \ge arrival\_TS(o_2) \ge f_1+1$.
+% Thus timestamps are strictly increasing per key. $\square$
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection*{Lemma 3 — Real-Time Consistency}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \textbf{Statement.}
+% If operation $o_1$ completes before $o_2$ is invoked,
+% then $final\_TS(o_1) < final\_TS(o_2)$.
+
+% \textbf{Proof.}
+% Completion of $o_1$ implies its Final record is replicated
+% and its $final\_TS$ has been incorporated into $ShardTS$
+% via the rule $ShardTS := final\_TS + 1$.
+% Any operation arriving afterward receives
+% $arrival\_TS \ge ShardTS$, guaranteeing
+% $final\_TS(o_2) \ge arrival\_TS(o_2) > final\_TS(o_1)$. $\square$
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection*{Lemma 4 — Acyclicity of Execution Graph}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \textbf{Statement.}
+% The global execution graph $G=(V,E)$, with edges:
+% (1) invocation order edges $(o_i,o_j)$ where $o_i <_I o_j$ for the same client,
+% (2) shard order edges $(o_i,o_j)$ where $final\_TS(o_i) < final\_TS(o_j)$ for the same key, and
+% (3) real-time edges $(o_i,o_j)$ where $o_i$ completes before $o_j$ begins,
+% is acyclic.
+
+% \textbf{Proof.}
+% Edges of type (1) form disjoint total orders per client.
+% Edges of type (2) are ordered by strictly increasing timestamps (Lemma 2).
+% Edges of type (3) are ordered by strictly increasing timestamps (Lemma 3).
+% Suppose, for contradiction, there exists a cycle.
+% Then there exist operations $o_1 \to o_2 \to \dots \to o_n \to o_1$
+% such that $final\_TS(o_1) < final\_TS(o_2) < \dots < final\_TS(o_n) < final\_TS(o_1)$,
+% a contradiction.  Hence $G$ is acyclic. $\square$
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection*{Lemma 5 — Recovery Safety}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \textbf{Statement.}
+% Upon leader recovery, the reconstructed state preserves the
+% timestamp ordering and invocation dependencies of the pre-failure state.
+
+% \textbf{Proof.}
+% The recovery algorithm processes each unordered replica $e$:
+% \begin{itemize}
+%     \item If $arrival\_TS(e)$ is found in any successor’s evidence, it is restored identically (Lemma 1).
+%     \item Otherwise, a fresh $arrival\_TS$ is chosen that exceeds all committed finals, preserving monotonicity (I2).
+% \end{itemize}
+% Next, $final\_TS(e) = \max(\foldl(pred\_arrivals), arrival\_TS(e))$
+% reconstructs consistent relative ordering with all recoverable predecessors.
+% If a predecessor is irrecoverable, suffix-enclosure (I5)
+% ensures all dependent successors are aborted,
+% preventing partial-order inversion.
+% Thus all timestamp relationships and invocation dependencies
+% hold across recovery boundaries. $\square$
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection*{Theorem — IOCL Correctness}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \textbf{Statement.}
+% The protocol ensures that every execution, including those with leader crashes and recovery, satisfies IOCL.
+
+% \textbf{Proof.}
+% Define the total order $<_L$ over all completed operations
+% by ascending $final\_TS$ (ties broken arbitrarily among commutative keys).
+
+% From Lemmas 2 and 3, $<_L$ respects both shard-local and real-time order.
+% By construction of $\textit{PredSet*}$, each client’s invocation order
+% is embedded in $<_L$.
+% Lemma 4 ensures the global dependency graph is acyclic,
+% so $<_L$ is a valid linearization order.
+% Lemma 5 ensures recovery preserves timestamp and invocation order,
+% and (I5) ensures that no successor survives the failure of its predecessor.
+% Therefore, $<_L$ remains a consistent extension of real-time and invocation order
+% under failures, satisfying IOCL. $\square$
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection*{Corollary — Suffix-Enclosed Failure Property}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% If any operation $o_i$ in a client’s invocation chain fails irrecoverably,
+% all its successors are also failed.
+% Hence the visible prefix of the client’s history remains linearizable.
+
+% \textbf{Proof.}
+% By (I5) and the recovery algorithm:
+% failure of $o_i$ implies its arrival or final timestamp cannot be recovered.
+% Every successor has $o_i$ in its predecessor set,
+% and cannot finalize without $arrival\_TS(o_i)$.
+% Therefore, all such successors remain non-ready and unexecuted,
+% preserving prefix closure of the visible history. $\square$
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \subsection*{Conclusion}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% All completed operations are linearized at their $final\_TS$,
+% which is totally ordered, respects real-time, and extends invocation order.
+% Recovery maintains these relationships, and suffix-enclosed failures
+% ensure no visible violation of per-client ordering.
+% Therefore, the protocol guarantees
+% \textbf{Invocation-Order Concurrent Linearizability} under failures.
+
+
+ 
