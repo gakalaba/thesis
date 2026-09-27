@@ -21,14 +21,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\
 %%%% Author & title page info
 
-\title{Dissertation Template for Princeton University}
+\title{Safe and Efficient Invocation-Order Concurrent Access to Linearizable Systems}
 
-\submitted{June 2010}  % degree conferral date (January, April, June, September, or November)
-\copyrightyear{2010}  % year in which the copyright is secured by publication of the dissertation.
-\author{First Middle Last}
-\adviser{Professor Smith}  %replace with the full name of your adviser
+\submitted{April 2026}  % degree conferral date (January, April, June, September, or November)
+\copyrightyear{2026}  % year in which the copyright is secured by publication of the dissertation.
+\author{Anja Kalaba}
+\advisers{Professor Wyatt Lloyd, Professor Amit Levy}  %replace with the full name of your adviser
 %\departmentprefix{Program in}  % defaults to "Department of", but programs need to change this.
-\department{Electrical Engineering}
+\department{Computer Science}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\
 %%%% Tweak float placements
@@ -59,11 +59,29 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\
 %%%% Use packages
 
-%\usepackage{amsfonts}
-
 %%% For figures
 \usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{decorations.pathreplacing,calligraphy}
+\usetikzlibrary{decorations.pathmorphing}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{comment}
+\usepackage{amssymb}% http://ctan.org/pkg/amssymb
+\usepackage{pifont}% http://ctan.org/pkg/pifont
+\usepackage{float}
 %\usepackage{subfig,rotate}
+
+%%% For algorithms
+\usepackage{algpseudocode}
+\usepackage[linesnumbered,ruled,noend]{algorithm2e}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage[normalem]{ulem}        % for \sout
+\newcommand{\crefrangeconjunction}{--}
 
 %%% for comments
 \usepackage{verbatim}
@@ -129,6 +147,7 @@
 \fi % proquest or online formatting
 \fi % printed or online formatting
 
+\usepackage[capitalize,noabbrev]{cleveref}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\
 %%%% Define commands
@@ -198,6 +217,65 @@
 
 \fi  % disable frontmatter
 
+%%%%%%%% FOR PROOFS %%%%%%%%%
+
+%%%%% Formalism %%%%%
+% Theorems
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{lem}{Lemma}[thm]
+\renewcommand{\qedsymbol}{$\blacksquare$}
+
+% Histories
+\DeclareMathOperator{\inv}{inv} % invocation
+\DeclareMathOperator{\res}{res} % response
+\DeclareMathOperator{\resp}{\res} % synonym response
+
+% I/O Automata
+\DeclareMathOperator*{\states}{\textit{states}}
+\DeclareMathOperator*{\start}{\textit{start}}
+\DeclareMathOperator*{\sig}{\textit{sig}}
+\DeclareMathOperator*{\trans}{\textit{trans}}
+\DeclareMathOperator*{\tasks}{\textit{tasks}}
+\DeclareMathOperator*{\acts}{\textit{acts}}
+\DeclareMathOperator*{\localacts}{\textit{local}}
+\DeclareMathOperator*{\extacts}{\textit{extacts}}
+\DeclareMathOperator*{\actin}{\textit{in}}
+\DeclareMathOperator*{\actout}{\textit{out}}
+\DeclareMathOperator*{\actint}{\textit{int}}
+\DeclareMathOperator*{\sched}{\textit{sched}}
+\DeclareMathOperator*{\trace}{\textit{trace}}
+\DeclareMathOperator*{\complete}{\textit{complete}}
+\DeclareMathOperator*{\systemf}{\textit{sys}}
+\DeclareMathOperator*{\user}{\textit{user}}
+\DeclareMathOperator*{\conflicts}{\mathcal{C}}
+\DeclareMathOperator*{\op}{\textit{op}}
+
+% Channels
+\DeclareMathOperator*{\send}{\textit{sendto}}
+\DeclareMathOperator*{\sent}{\textit{sent}}
+\DeclareMathOperator*{\request}{\textit{recvfrom}}
+\DeclareMathOperator*{\receive}{\textit{received}}
+\DeclareMathOperator*{\sendto}{\send}
+\DeclareMathOperator*{\recvfrom}{\request}
+
+% Types and objects
+\newcommand{\type}{\mathfrak{T}}
+\newcommand{\spec}{\mathfrak{S}}
+\DeclareMathOperator*{\vals}{\textit{vals}}
+\DeclareMathOperator*{\invs}{\textit{invs}}
+\DeclareMathOperator*{\resps}{\textit{resps}}
+\DeclareMathOperator*{\ops}{\textit{ops}}
+\newcommand{\invact}{\textit{inv}}
+\newcommand{\respact}{\textit{resp}}
+\newcommand{\stopact}{\textit{stop}}
+
+% Orders
+\newcommand{\caused}{\rightsquigarrow} % Causality for actions
+\newcommand{\rt}{\rightarrow} % Real-time
+
+% Transformation
+\DeclareMathOperator*{\transform}{\textit{conc}}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\
 %%%% Hide some chapters
@@ -220,7 +298,7 @@
 %%%% Import chapters
 
 \begin{document}
-
+\include{common}
 \makefrontmatter
 
 
@@ -229,8 +307,13 @@
 
 % \include lets us split up the document (and each include starts a new page):
 \include{ch-intro/chapter-intro}
-\include{ch-pastwork/chapter-pastwork}
-\include{ch-usage/chapter-usage}
+\include{ch-background/chapter-background}
+\include{ch-iocl/chapter-iocl}
+\include{ch-iocl-usage/chapter-iocl-usage}
+\include{ch-design/chapter-design}
+\include{ch-ellis/chapter-ellis}
+\include{ch-ellis_ct/chapter-ellis_ct}
+\include{ch-eval/chapter-eval}
 \include{ch-conclusion/chapter-conclusion}
 \appendix % all chapters following will be labeled as appendices
 \include{ch-appendicies/implementation}
