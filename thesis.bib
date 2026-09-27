@@ -1,121 +1,661 @@
-@electronic{proquest2006,
+@Comment Publishers
+@string{ACM="{ACM}"}
+@string{IEEE="{IEEE}"}
+@string{INTERNETSOCIETY="{The Internet Society}"}
+@string{SPRINGER="{Springer}"}
+@string{USENIX="{USENIX}"}
+@string{VLDBEND="{VLDB}"}
+
+@Comment Journal Abbreviations
+@string{CACM="{Communications of the ACM}"}
+@string{CCR="{ACM Computer Communications Review}"}
+@string{CSUR="{ACM Computing Surveys}"}
+@string{JACM="{Journal of the ACM}"}
+@string{QUEUE="{ACM Queue}"}
+@string{SICOMP="{SIAM Journal on Computing}"}
+@string{SIGACT="{ACM SIGACT News}"}
+@string{OSR="{ACM SIGOPS Operating Systems Review}"}
+@string{PER="{SIGMETRICS Performance Evaluation Review}"}
+@string{TEAC="{ACM Transactions on Economics and Computation}"}
+@string{TOCS="{ACM Transactions on Computer Systems}"}
+@string{TOC="{IEEE Transactions on Computers}"}
+@string{TODS="{ACM Transactions on Database Systems}"}
+@string{TOMACS="{ACM Transactions on Modeling and Computer Simulation}"}
+@string{TON="{IEEE/ACM Transactions on Networking}"}
+@string{TOPLAS="{ACM Transactions on Programming Languages and Systems}"}
+@string{TPDS="{IEEE Transactions on Parallel and Distributed Systems}"}
+@string{VLDB="{Proceedings of the Very Large Data Bases Endowment}"}
+@string{VLDBJ="{The VLDB Journal}"}
+
+@article{ahamad1995causal,
+  title={Causal Memory: Definitions, Implementation, and Programming},
+  author={Ahamad, Mustaque and Neiger, Gil and Burns, James E and Kohli, Prince and Hutto, Phillip W},
+  journal={Distributed Computing},
+  volume=9,
+  number=1,
+  pages={37--49},
+  year=1995,
+  publisher=SPRINGER,
+}
+
+@inproceedings{ajoux2015challenges,
+  title={Challenges To Adopting Stronger Consistency At Scale},
+  author={Phillipe Ajoux and Nathan Bronson and Sanjeev Kumar and Wyatt Lloyd and Kaushik Veeraraghavan},
+  crossref={hotos2015},
+  pages={1--7},
+}
+
+@article{dean2013tail,
+  author={Dean, Jeffrey and Barroso, Luiz Andr\'{e}},
+  title={The Tail at Scale},
+  year=2013,
+  publisher=ACM,
+  volume=56,
+  number=2,
+  issn={0001-0782},
+  journal=CACM,
+  month=feb,
+  pages={74--80},
+}
+
+@inproceedings{herlihy1987linearizability,
+  author = {Herlihy, M. P. and Wing, J. M.},
+  title = {Axioms for Concurrent Objects},
+  crossref={popl1987},
+  pages = {13--26},
+}
+
+@Misc{golang,
+author =   {Google},
+title =    {The Go Programming Language},
+howpublished = {\url{https://go.dev/}}
+}
+
+@article{herlihy1990linearizability,
+  author={Herlihy, Maurice P. and Wing, Jeannette M.},
+  title={Linearizability: A Correctness Condition for Concurrent Objects},
+  journal=TOPLAS,
+  volume=12,
+  number=3,
+  month=jul,
+  year=1990,
+  issn={0164-0925},
+  pages={463--492},
+  numpages=30,
+}
+
+@article{haerder1983acid,
+author = {Haerder, Theo and Reuter, Andreas},
+title = {Principles of transaction-oriented database recovery},
+year = {1983},
+issue_date = {December 1983},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {15},
+number = {4},
+issn = {0360-0300},
+url = {https://doi.org/10.1145/289.291},
+doi = {10.1145/289.291},
+journal = {ACM Comput. Surv.},
+month = dec,
+pages = {287–317},
+numpages = {31}
+}
+
+@article{papadimitriou1979serializability,
+  author={Papadimitriou, Christos H.},
+  title={The Serializability of Concurrent Database Updates},
+  journal=JACM,
+  volume=26,
+  number=4,
+  month=oct,
+  year=1979,
+  issn={0004-5411},
+  pages={631--653},
+  numpages=23,
+}
+
+@inproceedings{ongaro2014raft,
+  author={Diego Ongaro and John Ousterhout},
+  title={In Search of an Understandable Consensus Algorithm},
+  crossref={atc2014},
+  pages={305--319},
+}
+
+@article{lamport1998paxos,
+  title={The part-time parliament},
+  author={Leslie Lamport},
+  journal=TOCS,
+  volume=16,
+  number=2,
+  pages={133--169},
+  year=1998,
+}
+
+@inproceedings{oki1988vr,
+  title={Viewstamped Replication: A New Primary Copy Method to Support Highly-Available Distributed Systems},
+  author={Brian Oki and Barbara Liskov},
+  crossref={podc1988},
+  pages={8--17},
+}
+
+@inproceedings{mao2008mencius,
+  author={Mao, Yanhua and Junqueira, Flavio P. and Marzullo, Keith},
+  title={Mencius: Building Efficient Replicated State Machines for WANs},
+  crossref={osdi2008},
+  pages={369--384},
+}
+
+@inproceedings{moraru2013epaxos,
+  title={There Is More Consensus in Egalitarian Parliaments},
+  author={Iulian Moraru and David Andersen and Michael Kaminsky},
+  crossref={sosp2013},
+  pages={358--372},
+}
+
+@inproceedings{burke2020gryff,
+  author={Matthew Burke and Audrey Cheng and Wyatt Lloyd},
+  title={Gryff: Unifying Consensus and Shared Registers },
+  crossref={nsdi2020},
+  pages={591--617},
+}
+
+@inproceedings{lynch1987ioa,
+  author={Lynch, Nancy A. and Tuttle, Mark R.},
+  title={Hierarchical Correctness Proofs for Distributed Algorithms},
+  crossref={podc1987},
+  pages={137--151},
+}
+
+@book{lynch1996da,
+  author={Lynch, Nancy A.},
+  title={{Distributed Algorithms}},
+  year=1996,
+  isbn={9780080504704},
+  publisher={Morgan Kaufmann Publishers Inc.},
+  address={San Francisco, CA},
+}
+
+@misc{redis,
+  title = {{Redis} In memory database.},
+  howpublished = {\url{redis.io}}
+}
+
+@misc{fauna,
+  title = {{FaunaDB} a strongly consistent OLTP database.},
+  howpublished = {\url{https://faunadb.org}}
+}
+
+@misc{datadog,
+title = {{Data Dog} Monitoring Tool},
+howpublished = {\url{https://www.datadoghq.com/}}
+}
+
+@misc{grafana,
+title = {{Grafana} Analytics and Monitoring Tool},
+howpublished = {\url{https://grafana.com/}}
+}
+
+@misc{netdata,
+title = {{Netdata} Real-time Monitoring},
+howpublished = {\url{https://www.netdata.cloud/}}
+}
+
+@misc{retwis,
+  title = {{Retwis} Twitter-style social network clone.},
+  howpublished = {\url{https://github.com/pims/retwis-py/blob/master/domain.py}}
+}
+
+@misc{lamernewz,
+title = {{Lamer News} an HN style social news site.},
+howpublished = {\url{https://github.com/antirez/lamernews}}
+}
+
+@misc{github,
+title = {Github},
+howpublished = {\url{https://github.com/}}
+}
+
+@misc{redischatapp,
+title = {{Redis Chat App} A Chat Demo App Written in Python.},
+howpublished = {\url{https://github.com/redis-developer/basic-redis-chat-app-demo-python}}
+}
+
+@misc{redisleaderboard,
+title = {{Redis Leaderboard App} Basic Redis Leaderboard Demo Python (Django)},
+howpublished = {\url{https://github.com/redis-developer/basic-redis-leaderboard-demo-python}}}
+
+@inproceedings{helt2021rss,
+  author={Helt, Jeffrey and Burke, Matthew and Levy, Amit and Lloyd, Wyatt},
+  title={Regular Sequential Serializability and Regular Sequential Consistency},
+  crossref={sosp2021},
+  pages={163--179},
+}
+
+@inproceedings{veeraraghavan2016kraken,
+  author = {Kaushik Veeraraghavan and Justin Meza and David Chou and Wonho Kim and Sonia Margulis and Scott Michelson and Rajesh Nishtala and Daniel Obenshain and Dmitri Perelman and Yee Jiun Song},
+  title = {Kraken: Leveraging Live Traffic Tests to Identify and Resolve Resource Utilization Bottlenecks in Large Scale Web Services},
+    booktitle={OSDI},
+  address={Savannah, GA},
+  month=nov,
+  year=2016,
+  publisher=USENIX,
+  pages = {635--651},
+}
+%   crossref = {osdi2016},
+
+@inproceedings{hunt2010zookeeper,
+  title={ZooKeeper: Wait-free coordination for Internet-scale systems},
+  author={Patrick Hunt and Mahadev Konar and Flavio Junqueira and Benjamin Reed},
+  crossref={atc2010},
+  pages={1--14},
+}
+
+@article{lamport1979sequential,
+  author={Leslie Lamport},
+  journal=TOCS,
+  title={How to Make a Multiprocessor Computer That Correctly Executes Multiprocess Programs},
+  year=1979,
+  volume={C-28},
+  number=9,
+  pages={690--691},
+  issn={0018-9340},
+  month=sep,
+}
+
+@article{attiya1993seqlin,
+  author={Attiya, Hagit and Welch, Jennifer L.},
+  title={Sequential Consistency versus Linearizability},
+  journal=TOCS,
+  year=1994,
+  volume=12,
+  number=2,
+  issn={0734-2071},
+  month=may,
+  pages={91--122},
+  numpages=32
+}
+
+@techreport{goldman1993unifiedModel,
+  title={A Unified Model for Shared-Memory and Message-Passing Systems},
+  author={Kenneth Goldman and Katherine Yelick},
+  year=1993,
+  institution={Department of Computer Science and Engineering, Washington University in St. Louis},
+  number={WUCS-93-35},
+  source={https://openscholarship.wustl.edu/cse_research/324/},
+  address={St. Louis, MO},
+}
+
+@article{lundelius1984clocksync,
+  author={Jennifer Lundelius and Nancy Lynch},
+  title={An Upper and Lower Bound for Clock Synchronization},
+  journal={Information and Control},
+  volume=62,
+  number=2,
+  pages={190--204},
+  year=1984,
+  issn={0019-9958},
+}
+
+@article{fischer1985flp,
+  title={Impossibility of distributed consensus with one faulty process},
+  author={Michael Fischer and Nancy Lynch and Michael Paterson},
+  journal=JACM,
+  volume=32,
+  number=2,
+  pages={374--382},
+  year=1985,
+}
+
+
+
+@inproceedings{lloyd2011cops,
+  author={Lloyd, Wyatt and Freedman, Michael J. and Kaminsky, Michael and Andersen, David G.},
+  title={Don't Settle for Eventual: Scalable Causal Consistency for Wide-Area Storage with {COPS}},
+  crossref={sosp2011},
+  pages={401--416},
+}
+
+@inproceedings{lloyd2013eiger,
+  title={Stronger Semantics For Low-latency Geo-replicated Storage},
+  author={Wyatt Lloyd and Michael Freedman and Michael Kaminsky and David Andersen},
+  crossref={nsdi2013},
+  pages={313--328},
+}
+
+
+@article{cooper2008pnuts,
+  author={Cooper, Brian F. and Ramakrishnan, Raghu and Srivastava, Utkarsh and Silberstein, Adam and Bohannon, Philip and Jacobsen, Hans-Arno and Puz, Nick and Weaver, Daniel and Yerneni, Ramana},
+  title={{PNUTS}: Yahoo!'s Hosted Data Serving Platform},
+  year=2008,
+  publisher=VLDBEND,
+  volume=1,
+  number=2,
+  issn={2150-8097},
+  journal=VLDB,
+  month=aug,
+  pages={1277--1288},
+}
+
+@inproceedings{terry1994session,
+  author={D. B. {Terry} and A. J. {Demers} and K. {Petersen} and M. J. {Spreitzer} and M. M. {Theimer} and B. B. {Welch}},
+  title={Session guarantees for weakly consistent replicated data},
+  crossref={pdis1994},
+  pages={140--149},
+}
+
+@inproceedings{terry1995bayou,
+  author ={Terry, D. B. and Theimer, M. M. and Petersen, Karin and Demers, A. J. and Spreitzer, M. J. and Hauser, C. H.},
+  title ={Managing Update Conflicts in Bayou, a Weakly Connected Replicated Storage System},
+  crossref={sosp1995},
+  pages ={172--182},
+}
+
+@article{vogels2009eventual,
+author = {Vogels, Werner},
+title = {Eventually consistent},
+year = {2009},
+issue_date = {January 2009},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {52},
+number = {1},
+issn = {0001-0782},
+url = {https://doi.org/10.1145/1435417.1435432},
+doi = {10.1145/1435417.1435432},
+abstract = {Building reliable distributed systems at a worldwide scale demands trade-offs between consistency and availability.},
+journal = {Commun. ACM},
+month = jan,
+pages = {40–44},
+numpages = {5}
+}
+
+@online{proquest2006,
   title={{PQ/UMI GradWorks Guide F2006}},
   author={{ProQuest}},
-  year={2006},
-  howpublished={\url{http://www.princeton.edu/~mudd/thesis/Submissionguide.pdf}},
+  date={2006},
+  url={http://www.princeton.edu/~mudd/thesis/Submissionguide.pdf},
 }
 
-
-@electronic{mudd2009,
-  title={{Submitting your Doctoral Dissertation or Master�s Thesis to the Mudd Manuscript Library}},
+@online{mudd2009,
+  title={{Submitting your Doctoral Dissertation or Master's Thesis to the Mudd Manuscript Library}},
   author={{Seeley G. Mudd Manuscript Library}},
-  month={May},
-  year={2009},
-  howpublished={\url{http://www.princeton.edu/~mudd/thesis/}},
+  date={2009-05},
+  url={http://www.princeton.edu/~mudd/thesis/},
 }
 
-@electronic{muddthesis2009,
+@online{muddthesis2009,
   title={{Doctor of Philosophy Dissertation and Master's Thesis Requirements}},
   author={{Princeton University Library}},
-  month={September},
-  year={2009},
-  howpublished={\url{http://www.princeton.edu/~mudd/thesis/MuddDissertationRequirements.pdf}},
+  date={2009-09},
+  url={http://www.princeton.edu/~mudd/thesis/MuddDissertationRequirements.pdf},
 }
 
-@electronic{fear2005booktabs,
-  title={{Publication quality tables in LaTeX}},
-  author={Fear, S.},
-  howpublished={Available from CTAN, macros/latex/contrib/booktabs, \url{http://www.ctan.org/tex-archive/macros/latex/contrib/booktabs/booktabs.pdf}},
-  year={2005}
+@inproceedings{deCandia2007dynamo,
+ author={DeCandia, Giuseppe and Hastorun, Deniz and Jampani, Madan and Kakulapati, Gunavardhan and Lakshman, Avinash and Pilchin, Alex and Sivasubramanian, Swaminathan and Vosshall, Peter and Vogels, Werner},
+ title={Dynamo: {{Amazon's}} Highly Available Key-value Store},
+ crossref={sosp2007},
+ pages={205--220},
+}
+
+@phdthesis{adya1999weakcons,
+  author={Atul Adya},
+  advisor={Barbara Liskov},
+  school={MIT},
+  title={Weak Consistency: A Generalized Theory and Optimistic Implementations for Distributed Transactions},
+  month=mar,
+  year=1999,
+  publisher={MIT},
+  address={Cambridge, MA},
+}
+
+@phdthesis{ongaro2014consensus,
+  author={Ongaro, Diego},
+  advisor={John Ousterhout},
+  school={Stanford University},
+  title={Consensus: Bridging Theory and Practice},
+  month=aug,
+  year=2014,
+  publisher={Stanford University},
+  address={Stanford, CA}
+}
+
+@phdthesis{schwarzkopf2018operating,
+  title={Operating system support for warehouse-scale computing},
+  author={Schwarzkopf, Malte},
+  advisor={Steven Hand},
+  month=oct,
+  year=2018,
+  school={University of Cambridge},
+  publisher={University of Cambridge},
+  address={Cambridge, England},
+}
+
+@article{corbett2013spanner,
+  author={Corbett, James C. and Dean, Jeffrey and Epstein, Michael and Fikes, Andrew and Frost, Christopher and Furman, J. J. and Ghemawat, Sanjay and Gubarev, Andrey and Heiser, Christopher and Hochschild, Peter and Hsieh, Wilson and Kanthak, Sebastian and Kogan, Eugene and Li, Hongyi and Lloyd, Alexander and Melnik, Sergey and Mwaura, David and Nagle, David and Quinlan, Sean and Rao, Rajesh and Rolig, Lindsay and Saito, Yasushi and Szymaniak, Michal and Taylor, Christopher and Wang, Ruth and Woodford, Dale},
+  title={Spanner: {Google's} Globally Distributed Database},
+  year=2013,
+  publisher=ACM,
+  address={New York, NY},
+  volume=31,
+  number=3,
+  issn={0734-2071},
+  journal=TOCS,
+  month=aug,
+  articleno=8,
+  numpages=22,
+}
+
+@article{zhang2018tapir,
+  author={Zhang, Irene and Sharma, Naveen Kr. and Szekeres, Adriana and Krishnamurthy, Arvind and Ports, Dan R. K.},
+  title={Building Consistent Transactions with Inconsistent Replication},
+  journal=TOCS,
+  year=2018,
+  publisher=ACM,
+  volume=35,
+  number=4,
+  issn={0734-2071},
+  month=dec,
+  articleno=12,
+  pages={12:1--12:37},
+  numpages=37,
 }
 
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Other example citations. These are not referenced in the document and therefore are not included in the bibliography
-
-@electronic{dierks2008tls,
-  title={{The Transport Layer Security (TLS) Protocol, Version 1.2}},
-  author={Dierks, T. and Rescorla, E.},
-  institution={RFC 5246},
-  month={August},
-  year={2008},
-  howpublished={\url{http://tools.ietf.org/html/rfc5246}}
+@article{thomson2014calvin,
+  author={Thomson, Alexander and Diamond, Thaddeus and Weng, Shu-Chun and Ren, Kun and Shao, Philip and Abadi, Daniel J.},
+  title={Fast Distributed Transactions and Strongly Consistent Replication for OLTP Database Systems},
+  journal=TODS,
+  year=2014,
+  volume=39,
+  number=2,
+  issn={0362-5915},
+  month=may,
+  pages={11:1--11:39},
 }
 
-
-% Most papers can be cited as "inproceedings" or "conference"
-@INPROCEEDINGS{Dwoskin2007,
-  author = {Jeffrey S Dwoskin and Ruby B. Lee},
-  title = {{Hardware-rooted Trust for Secure Key Management and Transient Trust}},
-  booktitle = {{Proceedings of the 14th ACM Conference on Computer and Communications Security (CCS 2007)}},
-  year = {2007},
-  pages = {389-400},
-  address = {Alexandria, VA},
-  month = {October},
+@article{mahmoud2013replicatedCommit,
+ author={Mahmoud, Hatem and Nawab, Faisal and Pucher, Alexander and Agrawal, Divyakant and El Abbadi, Amr},
+ title={Low-latency Multi-datacenter Databases Using Replicated Commit},
+ journal=VLDB,
+ volume=6,
+ number=9,
+ month=jul,
+ year=2013,
+ issn={2150-8097},
+ pages={661--672},
+ numpages=12,
 }
 
-@conference{McGregor2003,
-  title={{A Processor Architecture Defense Against Buffer Overflow Attacks}},
-  author={McGregor, J.P. and Karig, D.K. and Shi, Z. and Lee, R.B.},
-  booktitle={Proceedings of the IEEE International Conference on Information Technology: Research and Education (ITRE 2003)},
-  pages={243--250},
-  year={2003},
+@inproceedings{mu2014rococo,
+  author={Shuai Mu and Yang Cui and Yang Zhang and Wyatt Lloyd and Jinyang Li},
+  title={Extracting More Concurrency from Distributed Transactions},
+  crossref={osdi2014},
+  pages={479--494},
 }
 
-% Articles within a journal or another publication use "article"
-@article{lee2003enlisting,
-  title={{Enlisting hardware architecture to thwart malicious code injection}},
-  author={Lee, R. and Karig, D. and McGregor, J.P. and Shi, Z.},
-  journal={Security in Pervasive Computing, LNCS 2802},
-  pages={237--252},
-  month={March},
-  year={2003},
-  publisher={Springer}
+@inproceedings{mu2016janus,
+  author={Shuai Mu and Lamont Nelson and Wyatt Lloyd and Jinyang Li},
+  title={Consolidating Concurrency Control and Consensus for Commits under Conflicts},
+  booktitle={OSDI},
+  address={Savannah, GA},
+  month=nov,
+  year=2016,
+  publisher=USENIX,
+  pages={517--532},
+}
+%   crossref={osdi2016},
+
+@inproceedings{kraska2013mdcc,
+  author={Tim Kraska and Gene Pang and Michael J. Franklin and Samuel Madden and Alan Fekete},
+  title={{MDCC}: Multi-data Center Consistency},
+  crossref={eurosys2013},
+  pages={113--126},
 }
 
-% books
-@book{anderson2008se,
-  title={{Security Engineering: A guide to building dependable distributed systems}},
-  author={Anderson, R.J.},
-  year={2008},
-  publisher={Wiley}
+@article{ren2019slog,
+  author={Ren, Kun and Li, Dennis and Abadi, Daniel J.},
+  title={{SLOG}: Serializable, Low-Latency, Geo-Replicated Transactions},
+  year=2019,
+  publisher=VLDBEND,
+  volume=12,
+  number=11,
+  issn={2150-8097},
+  journal=VLDB,
+  month=jul,
+  pages={1747--1761},
 }
 
-% or a chapter within a book
-@inbook{walters2007wireless,
-  title={{Wireless sensor network security: A survey}},
-  author={Walters, J.P. and Liang, Z. and Shi, W. and Chaudhary, V.},
-  series={Security in Distributed, Grid, Mobile, and Pervasive Computing},
-  chapter={17},
-  pages={367},
-  year={2007},
-  publisher={Auerbach Publications}
+@inproceedings{taft2020crdb,
+  author={Taft, Rebecca and Sharif, Irfan and Matei, Andrei and VanBenschoten, Nathan and Lewis, Jordan and Grieger, Tobias and Niemi, Kai and Woods, Andy and Birzin, Anne and Poss, Raphael and Bardea, Paul and Ranade, Amruta and Darnell, Ben and Gruneir, Bram and Jaffray, Justin and Zhang, Lucy and Mattis, Peter},
+  title={{CockroachDB}: The Resilient Geo-Distributed {SQL} Database},
+  crossref={sigmod2020},
+  pages={1493--1509},
 }
 
-% Published or unpublished technical reports can be cited
-@techreport{Dwoskin2008SPRef,
-  title={{SP Processor Architecture Reference Manual}},
-  author={Jeffrey S. Dwoskin and Ruby B. Lee},
-  institution={Princeton University Department of Electrical Engineering Technical Report CE-L2008-008},
-  month={August},
-  year={2008}
+@inproceedings{yan2018carousel,
+  author={Yan, Xinan and Yang, Linguan and Zhang, Hongbo and Lin, Xiayue Charles and Wong, Bernard and Salem, Kenneth and Brecht, Tim},
+  title={Carousel: Low-Latency Transaction Processing for Globally-Distributed Data},
+  crossref={sigmod2018},
+  pages={231--243},
 }
 
-% There are special types for masters and phd theses
-@mastersthesis{cotsdust,
-    author={Seth Hollar},
-    title={{COTS Dust}},
-    school={UC Berkeley},
-    year={2000},
-    month={December},
-    note={\url{http://siliconrobot.com/macro_motes/macromotes.html}},
-    url={http://siliconrobot.com/macro_motes/macromotes.html},
+@inproceedings{castro1999pbft,
+  title={Practical {Byzantine} Fault Tolerance},
+  author={Miguel Castro and Barbara Liskov},
+  crossref={osdi1999},
+  pages={173--186},
 }
 
-@phdthesis{hill2003saw,
-  title={{System architecture for wireless sensor networks}},
-  author={Hill, J.L.},
-  year={2003},
-  school={University of California}
+@inproceedings{duplyakin2019cloudlab,
+  author={Dmitry Duplyakin and Robert Ricci and Aleksander Maricq and Gary Wong and Jonathon Duerig and Eric Eide and Leigh Stoller and Mike Hibler and David Johnson and Kirk Webb and Aditya Akella and Kuangching Wang and Glenn Ricart and Larry Landweber and Chip Elliott and Michael Zink and Emmanuel Cecchet and Snigdhaswin Kar and Prabodh Mishra},
+  title={The Design and Operation of {CloudLab}},
+  crossref={atc2019},
+  pages={1--14},
+}
+
+@inproceedings{burrows2006chubby,
+  title={The Chubby lock service for loosely-coupled distributed systems},
+  author={Burrows, Mike},
+  booktitle={Proceedings of the 7th symposium on Operating systems design and implementation},
+  pages={335--350},
+  year={2006}
+}
+
+@misc{zippyblog,
+  title={{How we built a general purpose key value store for Facebook with ZippyDB}},
+  author={Sarang Masti},
+  howpublished={\url{https://engineering.fb.com/2021/08/06/core-infra/zippydb/}},
+  year={2021}
+}
+
+@misc{etcd,
+  title={{A distributed, reliable key-value store for the most critical data of a distributed system}},
+  author={etcd},
+  howpublished={\url{https://etcd.io/}},
+  year={2023}
+}
+
+@misc{wanpings,
+  title = {Cloud Ping},
+  key = {Cloud Datacenter Latency},
+  howpublished = {\url{https://www.cloudping.co/grid}},
+  note = {Accessed: 2023-12-07}
+}
+
+@inproceedings{antipode,
+author = {Ferreira Loff, Jo\~{a}o and Porto, Daniel and Garcia, Jo\~{a}o and Mace, Jonathan and Rodrigues, Rodrigo},
+title = {Antipode: Enforcing Cross-Service Causal Consistency in Distributed Applications},
+year = {2023},
+isbn = {9798400702297},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3600006.3613176},
+doi = {10.1145/3600006.3613176},
+booktitle = {Proceedings of the 29th Symposium on Operating Systems Principles},
+pages = {298–313},
+numpages = {16},
+location = {<conf-loc>, <city>Koblenz</city>, <country>Germany</country>, </conf-loc>},
+series = {SOSP '23}
+}
+
+@inproceedings{salus,
+author = {Wang, Yang and Kapritsos, Manos and Ren, Zuocheng and Mahajan, Prince and Kirubanandam, Jeevitha and Alvisi, Lorenzo and Dahlin, Mike},
+title = {Robustness in the Salus scalable block store},
+year = {2013},
+publisher = {USENIX Association},
+address = {USA},
+booktitle = {Proceedings of the 10th USENIX Conference on Networked Systems Design and Implementation},
+pages = {357–370},
+numpages = {14},
+location = {Lombard, IL},
+series = {nsdi'13}
+}
+
+@phdthesis{wang_dissertation_2014,
+  author       = {Yang Wang}, 
+  title        = {Separating Data from Metadata for Robustness and
+Scalability},
+  school       = {University of Texas at Austin},
+  year         = 2014,
+}
+
+@inproceedings{occult,
+author = {Mehdi, Syed Akbar and Littley, Cody and Crooks, Natacha and Alvisi, Lorenzo and Bronson, Nathan and Lloyd, Wyatt},
+title = {I can't believe it's not causal! scalable causal consistency with no slowdown cascades},
+year = {2017},
+isbn = {9781931971379},
+publisher = {USENIX Association},
+address = {USA},
+booktitle = {Proceedings of the 14th USENIX Conference on Networked Systems Design and Implementation},
+pages = {453–468},
+numpages = {16},
+location = {Boston, MA, USA},
+series = {NSDI'17}
+}
+
+@inproceedings{amdahl,
+author = {Amdahl, Gene M.},
+title = {Validity of the single processor approach to achieving large scale computing capabilities},
+year = {1967},
+isbn = {9781450378956},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/1465482.1465560},
+doi = {10.1145/1465482.1465560},
+abstract = {For over a decade prophets have voiced the contention that the organization of a single computer has reached its limits and that truly significant advances can be made only by interconnection of a multiplicity of computers in such a manner as to permit cooperative solution. Variously the proper direction has been pointed out as general purpose computers with a generalized interconnection of memories, or as specialized computers with geometrically related memory interconnections and controlled by one or more instruction streams.},
+booktitle = {Proceedings of the April 18-20, 1967, Spring Joint Computer Conference},
+pages = {483–485},
+numpages = {3},
+location = {Atlantic City, New Jersey},
+series = {AFIPS '67 (Spring)}
+}
+
+@article{weerkamp,
+author = {Weerkamp, Wouter and Carter, Simon and Tsagkias, Manos},
+year = {2011},
+month = {01},
+pages = {},
+title = {How People Use Twitter in Different Languages},
+journal = {Text}
 }
