@@ -514,104 +514,106 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\begin{algorithm}[!tb]
-  \caption{Ellis\_CT Leader}
-  \label{ellis-ct-leaderprotocol}
-  \begin{algorithmic}[1]
-    \State $\mathcal{R}$ \Comment{Shard replicas}
-    \State $ShardTS \gets 0$
-    \State $\textit{unorderedBag} \gets \emptyset$
-    \State $\textit{orderedLog} \gets []$
-    \Procedure{\leaderSubmit}{Op, K, V, r, P}
-      \State $entry := \createntry(Op, K, V, r, P)$
-      \State $\textit{unorderedBag}\append(entry)$
-      \State \textbf{send} $\Accept(entry)$ to all $r \in \mathcal{R}$ \Comment{Unordered replication}
-      \EndProcedure
-    \Procedure{\leaderHandleAccept}{\textit{*entry*}}
-      \State $entry.\mathrm{acks} \mathrel{+}= 1$
-      \If{$entry.\mathrm{acks} \ge |Q|$}
-        \State $entry.\mathrm{committed} \gets True$
-        \State $entry.\mathrm{arrival\_TS} \gets ShardTS$; $ShardTS \gets ShardTS + 1$
-        \State $\textit{orderedLog}\insertSorted(entry)$
-        \State $entry.\mathrm{ready} \gets False$
-        \State \textbf{send} $\coordresp(entry.\mathrm{arrival\_TS})$ to all $\ell_i \in$ \textit{*entry*}.successors
-        \EndIf
-      \EndProcedure
-    \Procedure{\leaderSubmitCR}{\textit{*pred*}, \textit{*req*}}
-      \State $pred.\mathrm{succrq} := \textit{req}$
-      \If{$entry := \textit{orderedLog}\find(pred) \neq NULL$}
-        \State \textbf{send} $\coordresp(entry.\mathrm{arrival\_TS})$ to $L\_{req}$
-        \Else
-        \State \textbf{wait} $entry := \textit{unorderedBag}\find(pred) \neq NULL$
-        \State \textbf{wait} $entry.\mathrm{committed}$
-        \State \textbf{send} $\coordresp(entry.\mathrm{arrival\_TS})$ to $L\_{req}$
-        \EndIf
-      \EndProcedure
-    \Procedure{\leaderCoordResp}{\textit{*req*}, \textit{*pred\_arrivals*}}
-      \State \textbf{wait} $entry := \textit{orderedLog}\find(req) \neq NULL$
-      \State $entry.\mathrm{final\_TS} \gets \max(\foldl(pred\_arrivals), entry.\mathrm{arrival\_TS})$
-      \State $entry.\mathrm{ready} \gets True$
-      \State $ShardTS \gets entry.\mathrm{final\_TS} + 1$
-      \State \textbf{send} $\FinalAccept(entry)$ to all $r \in \mathcal{R}$
-      \EndProcedure
-    \Procedure{\leaderFinalCoordResp}{req}
-      \State \textbf{wait} $tis$
-      \EndProcedure
-    \Procedure{\leaderHandleFinalAccept}{\textit{*entry*}}
-      \State $entry.\mathrm{facks} \mathrel{+}= 1$
-      \If{$entry.\mathrm{facks} \ge |Q|$}
-        \State \textbf{send} $\commit(entry)$ to all $r \in \mathcal{R}$
-        \State $v := \execute(entry)$
-        \State \textbf{send} $\requestreply(entry, v)$ to $\textit{client}$
-        \EndIf
-      \EndProcedure
-  \end{algorithmic}
-\end{algorithm}
+
+
+% \begin{algorithm}[!tb]
+%   \caption{Ellis\_CT Leader}
+%   \label{ellis-ct-leaderprotocol}
+%   \begin{algorithmic}[1]
+%     \State $\mathcal{R}$ \Comment{Shard replicas}
+%     \State $ShardTS \gets 0$
+%     \State $\textit{unorderedBag} \gets \emptyset$
+%     \State $\textit{orderedLog} \gets []$
+%     \Procedure{\leaderSubmit}{Op, K, V, r, P}
+%       \State $entry := \createntry(Op, K, V, r, P)$
+%       \State $\textit{unorderedBag}\append(entry)$
+%       \State \textbf{send} $\Accept(entry)$ to all $r \in \mathcal{R}$ \Comment{Unordered replication}
+%       \EndProcedure
+%     \Procedure{\leaderHandleAccept}{\textit{*entry*}}
+%       \State $entry.\mathrm{acks} \mathrel{+}= 1$
+%       \If{$entry.\mathrm{acks} \ge |Q|$}
+%         \State $entry.\mathrm{committed} \gets True$
+%         \State $entry.\mathrm{arrival\_TS} \gets ShardTS$; $ShardTS \gets ShardTS + 1$
+%         \State $\textit{orderedLog}\insertSorted(entry)$
+%         \State $entry.\mathrm{ready} \gets False$
+%         \State \textbf{send} $\coordresp(entry.\mathrm{arrival\_TS})$ to all $\ell_i \in$ \textit{*entry*}.successors
+%         \EndIf
+%       \EndProcedure
+%     \Procedure{\leaderSubmitCR}{\textit{*pred*}, \textit{*req*}}
+%       \State $pred.\mathrm{succrq} := \textit{req}$
+%       \If{$entry := \textit{orderedLog}\find(pred) \neq NULL$}
+%         \State \textbf{send} $\coordresp(entry.\mathrm{arrival\_TS})$ to $L\_{req}$
+%         \Else
+%         \State \textbf{wait} $entry := \textit{unorderedBag}\find(pred) \neq NULL$
+%         \State \textbf{wait} $entry.\mathrm{committed}$
+%         \State \textbf{send} $\coordresp(entry.\mathrm{arrival\_TS})$ to $L\_{req}$
+%         \EndIf
+%       \EndProcedure
+%     \Procedure{\leaderCoordResp}{\textit{*req*}, \textit{*pred\_arrivals*}}
+%       \State \textbf{wait} $entry := \textit{orderedLog}\find(req) \neq NULL$
+%       \State $entry.\mathrm{final\_TS} \gets \max(\foldl(pred\_arrivals), entry.\mathrm{arrival\_TS})$
+%       \State $entry.\mathrm{ready} \gets True$
+%       \State $ShardTS \gets entry.\mathrm{final\_TS} + 1$
+%       \State \textbf{send} $\FinalAccept(entry)$ to all $r \in \mathcal{R}$
+%       \EndProcedure
+%     \Procedure{\leaderFinalCoordResp}{req}
+%       \State \textbf{wait} $tis$
+%       \EndProcedure
+%     \Procedure{\leaderHandleFinalAccept}{\textit{*entry*}}
+%       \State $entry.\mathrm{facks} \mathrel{+}= 1$
+%       \If{$entry.\mathrm{facks} \ge |Q|$}
+%         \State \textbf{send} $\commit(entry)$ to all $r \in \mathcal{R}$
+%         \State $v := \execute(entry)$
+%         \State \textbf{send} $\requestreply(entry, v)$ to $\textit{client}$
+%         \EndIf
+%       \EndProcedure
+%   \end{algorithmic}
+% \end{algorithm}
 
 
 
-\begin{algorithm}[!tb]
-  \caption{Ellis\_CT Leader (CONTINUEEEEDD MERGE SECOND HALF)}
-  \label{alg:iocl_no_failures}
-  \begin{algorithmic}[1]
-    \State $\mathcal{L} \gets \{...\}$ \Comment{Shard Leaders}
-    \State $\mathcal{R}$ \Comment{Set of all replicas in shard}
-    \State $ShardTS \gets 0$
-    \State $last\_ready\_TS[k] \gets 0,\; \forall k$ \Comment{Per-key counter}
-    \Procedure{\leaderSubmit}{\textit{*Op*}, K, V, P, s, preds}
-      \State $entry := \createntry(\textit{Op}, K, V, P, s, preds)$
-      \State $entry.\mathrm{arrival\_ts} = ShardTS$
-      \State $ShardTS \gets ShardTS + 1$
-      \State $\textit{bufferedSet}\append(entry)$
-      \State \textbf{send} $\textit{Accept}(entry)$ to all $r \in \mathcal{R}$
-      \State \textbf{send} $\textit{ArrivalTS}(entry.\mathrm{arrival\_ts})$ to all successors in $\mathcal{L}$
-      \EndProcedure
-    \Procedure{\leaderHandleArrivalAcks}{entry}
-      \Statex \Comment{All predecessor arrival timestamps received}
-      \State \textbf{wait} $entry.\mathrm{pred\_arrival\_ts}[i] \neq \textit{NULL}$ for all $i \in entry.\mathrm{preds}$
-      \State $folded \gets \texttt{foldl}(entry.\mathrm{pred\_arrival\_ts})$
-      \State $entry.\mathrm{assigned\_ts} \gets \max(folded, last\_ready\_TS[entry.K] + 1)$
-      \State $\textit{orderedLog}\insertSorted(entry, key = entry.\mathrm{assigned\_ts})$
-      \State \textbf{send} $\textit{AssignedTS}(entry.\mathrm{assigned\_ts})$ to all successors in $\mathcal{L}$
-      \EndProcedure
-    \Procedure{\leaderHandleAssignedAcks}{entry}
-      \Statex \Comment{All predecessor assigned timestamps received (2nd round)}
-      \State \textbf{wait} $entry.\mathrm{pred\_assigned\_ts}[i] \neq \textit{NULL}$ for all $i \in entry.\mathrm{preds}$
-      \State $entry.\mathrm{final\_ts} \gets \texttt{foldl}(entry.\mathrm{pred\_assigned\_ts})$
-      \State $entry.\mathrm{ready} \gets \textit{True}$
-      \State $last\_ready\_TS[entry.K] \gets entry.\mathrm{final\_ts}$
-      \State $\textit{orderedLog}\resort(entry, sortkey = entry.\mathrm{final\_ts})$
-      \EndProcedure
-    \Procedure{\leaderCommitAndExecute}{entry}
-      \Statex \Comment{Commit when entry reaches head of log and is ready}
-      \State \textbf{wait} $\textit{orderedLog.head()} == entry \land entry.\mathrm{ready}$
-      \If{\textit{*no unexecuted entry on same key precedes entry*}}
-        \State $v := \execute(entry)$
-        \State $\textit{SubmitOpReply}(entry, v)$ to $entry.\mathrm{client}$
-        \EndIf
-      \EndProcedure
-  \end{algorithmic}
-\end{algorithm}
+% \begin{algorithm}[!tb]
+%   \caption{Ellis\_CT Leader (CONTINUEEEEDD MERGE SECOND HALF)}
+%   \label{alg:iocl_no_failures}
+%   \begin{algorithmic}[1]
+%     \State $\mathcal{L} \gets \{...\}$ \Comment{Shard Leaders}
+%     \State $\mathcal{R}$ \Comment{Set of all replicas in shard}
+%     \State $ShardTS \gets 0$
+%     \State $last\_ready\_TS[k] \gets 0,\; \forall k$ \Comment{Per-key counter}
+%     \Procedure{\leaderSubmit}{\textit{*Op*}, K, V, P, s, preds}
+%       \State $entry := \createntry(\textit{Op}, K, V, P, s, preds)$
+%       \State $entry.\mathrm{arrival\_ts} = ShardTS$
+%       \State $ShardTS \gets ShardTS + 1$
+%       \State $\textit{bufferedSet}\append(entry)$
+%       \State \textbf{send} $\textit{Accept}(entry)$ to all $r \in \mathcal{R}$
+%       \State \textbf{send} $\textit{ArrivalTS}(entry.\mathrm{arrival\_ts})$ to all successors in $\mathcal{L}$
+%       \EndProcedure
+%     \Procedure{\leaderHandleArrivalAcks}{entry}
+%       \Statex \Comment{All predecessor arrival timestamps received}
+%       \State \textbf{wait} $entry.\mathrm{pred\_arrival\_ts}[i] \neq \textit{NULL}$ for all $i \in entry.\mathrm{preds}$
+%       \State $folded \gets \texttt{foldl}(entry.\mathrm{pred\_arrival\_ts})$
+%       \State $entry.\mathrm{assigned\_ts} \gets \max(folded, last\_ready\_TS[entry.K] + 1)$
+%       \State $\textit{orderedLog}\insertSorted(entry, key = entry.\mathrm{assigned\_ts})$
+%       \State \textbf{send} $\textit{AssignedTS}(entry.\mathrm{assigned\_ts})$ to all successors in $\mathcal{L}$
+%       \EndProcedure
+%     \Procedure{\leaderHandleAssignedAcks}{entry}
+%       \Statex \Comment{All predecessor assigned timestamps received (2nd round)}
+%       \State \textbf{wait} $entry.\mathrm{pred\_assigned\_ts}[i] \neq \textit{NULL}$ for all $i \in entry.\mathrm{preds}$
+%       \State $entry.\mathrm{final\_ts} \gets \texttt{foldl}(entry.\mathrm{pred\_assigned\_ts})$
+%       \State $entry.\mathrm{ready} \gets \textit{True}$
+%       \State $last\_ready\_TS[entry.K] \gets entry.\mathrm{final\_ts}$
+%       \State $\textit{orderedLog}\resort(entry, sortkey = entry.\mathrm{final\_ts})$
+%       \EndProcedure
+%     \Procedure{\leaderCommitAndExecute}{entry}
+%       \Statex \Comment{Commit when entry reaches head of log and is ready}
+%       \State \textbf{wait} $\textit{orderedLog.head()} == entry \land entry.\mathrm{ready}$
+%       \If{\textit{*no unexecuted entry on same key precedes entry*}}
+%         \State $v := \execute(entry)$
+%         \State $\textit{SubmitOpReply}(entry, v)$ to $entry.\mathrm{client}$
+%         \EndIf
+%       \EndProcedure
+%   \end{algorithmic}
+% \end{algorithm}
 
 
 
@@ -619,58 +621,58 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
 
 
 
-\begin{algorithm}[!tb]
-  \caption{Ellis\_CT ALSO MERGE THIS PLEASE}
-  \label{alg:iocl_fail_tolerant}
-  \begin{algorithmic}[1]
-    \State $\mathcal{L} \gets \{...\}$ \Comment{Shard Leaders}
-    \State $\mathcal{R}$ \Comment{Replicas in shard}
-    \State $ShardTS \gets 0$
-    \State $last\_ready\_TS[k] \gets 0, \forall k$
-    \Procedure{\leaderSubmit}{\textit{*Op*}, K, V, P, s, preds}
-      \State $entry := \createntry(\textit{Op}, K, V, P, s, preds)$
-      \State $entry.\mathrm{arrival\_ts} = ShardTS$
-      \State $ShardTS \gets ShardTS + 1$
-      \State $entry.\mathrm{status} \gets \textit{RESERVED}$
-      \Statex \Comment{Replicate unordered Reservation before externalization}
-      \State \textbf{send} $\textit{Accept}(entry)$ to all $r \in \mathcal{R}$
-      \EndProcedure
-    \Procedure{\leaderHandleAccept}{\textit{*entry*}}
-      \State $entry.\mathrm{acks} \mathrel{+}=1$
-      \If{$entry.\mathrm{acks} \ge |Q|$}
-        \State $entry.\mathrm{committed} \gets \textit{True}$
-        \State \textbf{send} $\textit{ArrivalTS}(entry.\mathrm{arrival\_ts})$ to all successors in $\mathcal{L}$
-        \EndIf
-      \EndProcedure
-    \Procedure{\leaderHandleArrivalAcks}{entry}
-      \Statex \Comment{All predecessor arrival timestamps received}
-      \State \textbf{wait} $entry.\mathrm{pred\_arrival\_ts}[i] \neq NULL$ for all $i \in entry.\mathrm{preds}$
-      \State $folded \gets \texttt{foldl}(entry.\mathrm{pred\_arrival\_ts})$
-      \State $entry.\mathrm{assigned\_ts} \gets \max(folded, last\_ready\_TS[entry.K]+1)$
-      \State \textbf{send} $\textit{AssignedTS}(entry.\mathrm{assigned\_ts})$ to all successors in $\mathcal{L}$
-      \EndProcedure
-    \Procedure{\leaderHandleAssignedAcks}{entry}
-      \Statex \Comment{All predecessor assigned timestamps received}
-      \State \textbf{wait} $entry.\mathrm{pred\_assigned\_ts}[i] \neq NULL$ for all $i \in entry.\mathrm{preds}$
-      \State $entry.\mathrm{final\_ts} \gets \texttt{foldl}(entry.\mathrm{pred\_assigned\_ts})$
-      \State $entry.\mathrm{ready} \gets \textit{True}$
-      \State $last\_ready\_TS[entry.K] \gets entry.\mathrm{final\_ts}$
-      \Statex \Comment{Prepare Evidence set for final replication}
-      \State $entry.\mathrm{Evidence} \gets \{(entry.id, entry.assigned\_ts)\} \cup \{(p, assigned\_ts(p)) \mid p \in entry.preds\}$
-      \State $entry.\mathrm{status} \gets \textit{FINAL}$
-      \State $\textit{orderedLog}\insertSorted(entry, key = entry.\mathrm{final\_ts})$
-      \State \textbf{send} $\textit{Commit}(entry)$ to all $r \in \mathcal{R}$
-      \EndProcedure
-    \Procedure{\leaderCommitAndExecute}{entry}
-      \Statex \Comment{Replicas ack final commit}
-      \State \textbf{wait} $\textit{orderedLog.head()} == entry \land entry.\mathrm{ready}$
-      \If{\textit{*no unexecuted entry on same key precedes entry*}}
-        \State $v := \execute(entry)$
-        \State $\textit{SubmitOpReply}(entry, v)$ to $entry.\mathrm{client}$
-        \EndIf
-      \EndProcedure
-  \end{algorithmic}
-\end{algorithm}
+% \begin{algorithm}[!tb]
+%   \caption{Ellis\_CT ALSO MERGE THIS PLEASE}
+%   \label{alg:iocl_fail_tolerant}
+%   \begin{algorithmic}[1]
+%     \State $\mathcal{L} \gets \{...\}$ \Comment{Shard Leaders}
+%     \State $\mathcal{R}$ \Comment{Replicas in shard}
+%     \State $ShardTS \gets 0$
+%     \State $last\_ready\_TS[k] \gets 0, \forall k$
+%     \Procedure{\leaderSubmit}{\textit{*Op*}, K, V, P, s, preds}
+%       \State $entry := \createntry(\textit{Op}, K, V, P, s, preds)$
+%       \State $entry.\mathrm{arrival\_ts} = ShardTS$
+%       \State $ShardTS \gets ShardTS + 1$
+%       \State $entry.\mathrm{status} \gets \textit{RESERVED}$
+%       \Statex \Comment{Replicate unordered Reservation before externalization}
+%       \State \textbf{send} $\textit{Accept}(entry)$ to all $r \in \mathcal{R}$
+%       \EndProcedure
+%     \Procedure{\leaderHandleAccept}{\textit{*entry*}}
+%       \State $entry.\mathrm{acks} \mathrel{+}=1$
+%       \If{$entry.\mathrm{acks} \ge |Q|$}
+%         \State $entry.\mathrm{committed} \gets \textit{True}$
+%         \State \textbf{send} $\textit{ArrivalTS}(entry.\mathrm{arrival\_ts})$ to all successors in $\mathcal{L}$
+%         \EndIf
+%       \EndProcedure
+%     \Procedure{\leaderHandleArrivalAcks}{entry}
+%       \Statex \Comment{All predecessor arrival timestamps received}
+%       \State \textbf{wait} $entry.\mathrm{pred\_arrival\_ts}[i] \neq NULL$ for all $i \in entry.\mathrm{preds}$
+%       \State $folded \gets \texttt{foldl}(entry.\mathrm{pred\_arrival\_ts})$
+%       \State $entry.\mathrm{assigned\_ts} \gets \max(folded, last\_ready\_TS[entry.K]+1)$
+%       \State \textbf{send} $\textit{AssignedTS}(entry.\mathrm{assigned\_ts})$ to all successors in $\mathcal{L}$
+%       \EndProcedure
+%     \Procedure{\leaderHandleAssignedAcks}{entry}
+%       \Statex \Comment{All predecessor assigned timestamps received}
+%       \State \textbf{wait} $entry.\mathrm{pred\_assigned\_ts}[i] \neq NULL$ for all $i \in entry.\mathrm{preds}$
+%       \State $entry.\mathrm{final\_ts} \gets \texttt{foldl}(entry.\mathrm{pred\_assigned\_ts})$
+%       \State $entry.\mathrm{ready} \gets \textit{True}$
+%       \State $last\_ready\_TS[entry.K] \gets entry.\mathrm{final\_ts}$
+%       \Statex \Comment{Prepare Evidence set for final replication}
+%       \State $entry.\mathrm{Evidence} \gets \{(entry.id, entry.assigned\_ts)\} \cup \{(p, assigned\_ts(p)) \mid p \in entry.preds\}$
+%       \State $entry.\mathrm{status} \gets \textit{FINAL}$
+%       \State $\textit{orderedLog}\insertSorted(entry, key = entry.\mathrm{final\_ts})$
+%       \State \textbf{send} $\textit{Commit}(entry)$ to all $r \in \mathcal{R}$
+%       \EndProcedure
+%     \Procedure{\leaderCommitAndExecute}{entry}
+%       \Statex \Comment{Replicas ack final commit}
+%       \State \textbf{wait} $\textit{orderedLog.head()} == entry \land entry.\mathrm{ready}$
+%       \If{\textit{*no unexecuted entry on same key precedes entry*}}
+%         \State $v := \execute(entry)$
+%         \State $\textit{SubmitOpReply}(entry, v)$ to $entry.\mathrm{client}$
+%         \EndIf
+%       \EndProcedure
+%   \end{algorithmic}
+% \end{algorithm}
 
 
 
