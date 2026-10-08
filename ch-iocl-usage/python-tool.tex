@@ -422,21 +422,36 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
           \Comment{Per-shard request ID}
         \State $\sigma[i]\mathrel{+}=1$
   
-        \State $P\gets\mathrm{dom}(D)$
-          \Comment{Predecessors}
+        % \State $P\gets\mathrm{dom}(D)$
+        %   \Comment{Predecessors}
+        \State $P\gets
+            \langle(\rho',i')\in\mathrm{dom}(D)
+            \text{ in client invocation order}\rangle$
+            \Comment{Ordered predecessors}
   
         \State $m_{\mathrm{req}}
           \gets(\textit{Op},K,V,\rho,i,P)$
         \State \textbf{send} $\clientToLeader(m_{\mathrm{req}})$
           to $\ell_i\in\mathcal{L}$
   
-        \For{$\mathrm{each}\ (\rho',i')\in P$}
-          \State $\ell_{i'}\in\mathcal{L}
-            \gets\mathsf{shard\_leader}(i')$
-          \State $m_{\mathrm{cr}}\gets(\rho',\rho,i)$
-          \State \textbf{send} $\clientToLeaderCR(m_{\mathrm{cr}})$
-            to $\ell_{i'}\in\mathcal{L}$
-        \EndFor
+        % \For{$\mathrm{each}\ (\rho',i')\in P$}
+        %   \State $\ell_{i'}\in\mathcal{L}
+        %     \gets\mathsf{shard\_leader}(i')$
+        %   \State $m_{\mathrm{cr}}\gets(\rho',\rho,i)$
+        %   \State \textbf{send} $\clientToLeaderCR(m_{\mathrm{cr}})$
+        %     to $\ell_{i'}\in\mathcal{L}$
+        % \EndFor
+        \For{$j\gets 0$ \textbf{to} $|P|-1$}
+            \State $(\rho',i')\gets P[j]$
+            \State $\ell_{i'}\in\mathcal{L}
+                \gets\mathsf{shard\_leader}(i')$
+            \State $m_{\mathrm{cr}}
+                \gets(\rho',\rho,i,j)$
+                \Comment{Include predecessor index}
+            \State \textbf{send}
+                $\clientToLeaderCR(m_{\mathrm{cr}})$
+                to $\ell_{i'}\in\mathcal{L}$
+            \EndFor
   
         \State $D(\rho,i)\gets 0$
           \Comment{Insert as future dependency}
@@ -457,11 +472,18 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
               $\RequestReply(m_{\mathrm{resp}},v)$
               \Comment{Blocking}
   
-          \State $P^+\gets m_{\mathrm{resp}}.P
-            \cup
-            \{(m_{\mathrm{resp}}.\rho,m_{\mathrm{resp}}.i)\}$
+        %   \State $P^+\gets m_{\mathrm{resp}}.P
+        %     \cup
+        %     \{(m_{\mathrm{resp}}.\rho,m_{\mathrm{resp}}.i)\}$
+        %     \Comment{References released by response}
+          \State $P^+\gets
+            m_{\mathrm{resp}}.P
+            \mathbin{\|}
+            \langle
+            (m_{\mathrm{resp}}.\rho,m_{\mathrm{resp}}.i)
+            \rangle$
             \Comment{References released by response}
-  
+
           \For{$\mathrm{each}\ (\rho',i')\in P^+$}
             \State $D(\rho',i')\mathrel{-}=1$
             \If{$D(\rho',i')=0$}
