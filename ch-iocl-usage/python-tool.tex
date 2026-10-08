@@ -112,7 +112,11 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
 \providecommand{\requestreply}{\textsc{RequestReply}}
 
 \providecommand{\commit}{\textsc{Commit}}
-
+\providecommand{\leaderVR1Quorum}{\textsc{Leader::VR1QuorumRecv}}
+\providecommand{\ArrivalTSResponse}{\textsc{Leader::ArrivalTSResponseRecv}}
+\providecommand{\FinalAck}{\textsc{Leader::FinalAckRecvHERE}}
+\providecommand{\leaderFinalAck}{\textsc{Leader::FinalAckRecv}}
+\providecommand{\leaderArrivalTSResp}{\textsc{Leader::ArrivalTSResponseRecv}}
 
 
 
@@ -514,7 +518,222 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\begin{algorithm}[!tb]
+    \caption{Ellis\_CT Shard Leader: State and Timestamp Assignment}
+    \label{ellis-ct-leader-timestamps}
+    \begin{algorithmic}[1]
+      \State $i\gets$ this shard
+      \State $\ell_i\gets$ this shard's leader
+      \State $\mathcal{R}_i\gets\{\ldots\}$
+        \Comment{Replicas of shard $i$}
+      \State $\mathit{shardTS}\gets 0$
+      \State $\mathit{lastReadyTS}[\cdot]\gets 0$
+        \Comment{Per-key READY timestamp frontier}
+      \State $E:\mathsf{Rid}\rightharpoonup\mathsf{Entry};
+        \quad E\gets\emptyset$
+        \Comment{Operations at this shard}
+      \State $Q[\cdot]\gets\emptyset$
+        \Comment{Per-key pending-operation queues}
+      \State $C\gets\langle\rangle$
+        \Comment{Shard-wide commit log}
+      \State $\mathit{nextExec}\gets 0$
+        \Comment{Next commit-log index to execute}
+  
+      \Function{\foldl}{$A$}
+        \If{$|A|=0$}
+          \State \textbf{return} $0$
+        \EndIf
+        \State $t\gets A[0]+1$
+        \For{$j\gets 1$ \textbf{to} $|A|-1$}
+          \If{$A[j]>t$}
+            \State $t\gets A[j]+1$
+          \Else
+            \State $t\gets t+1$
+          \EndIf
+        \EndFor
+        \State \textbf{return} $t$
+      \EndFunction
+  
+      \Procedure{\leaderSubmit}{$m_{\mathrm{req}}$}
+        \State $(\textit{Op},K,V,\rho,i,P)\gets m_{\mathrm{req}}$
+        \State $e\gets\mathsf{newEntry}(m_{\mathrm{req}})$
+        \State $e.A[0\ldots |P|-1]\gets\bot$
+          \Comment{Ordered predecessor arrival timestamps}
+        \State $e.F[0\ldots |P|-1]\gets\mathsf{false}$
+          \Comment{Predecessor final acknowledgments}
+        \State $e.S\gets\emptyset$
+          \Comment{Registered successors}
+        \State $e.\mathit{vr1Done}\gets\mathsf{false}$
+        \State $e.\mathit{ready}\gets\mathsf{false}$
+        \State $e.\mathit{vr2Done}\gets\mathsf{false}$
+        \State $e.\mathit{logIndex}\gets\bot$
+        \State $E(\rho)\gets e$
+        \State \textbf{replicate} $m_{\mathrm{req}}$ to $\mathcal{R}_i$
+          \Comment{Begin VR round 1}
+      \EndProcedure
+  
+      \Procedure{\leaderVR1Quorum}{$\rho$}
+        \State $e\gets E(\rho)$
+        \If{$e.\mathit{vr1Done}$}
+          \State \textbf{return}
+        \EndIf
+        \State $e.\mathit{vr1Done}\gets\mathsf{true}$
+        \State $K\gets e.m_{\mathrm{req}}.K$
+        \State $e.\mathit{arrivalTS}\gets
+          \max(\mathit{shardTS},\mathit{lastReadyTS}[K])$
+        \State $e.\mathit{finalTS}\gets e.\mathit{arrivalTS}$
+        \State $\mathit{shardTS}\mathrel{+}=1$
+        \State $Q[K]\gets Q[K]\cup\{e\}$
+          \Comment{Order by $(\mathit{finalTS},\rho)$}
+  
+        \For{$\mathrm{each}\;(\rho_s,i_s,j)\in e.S$}
+          \State $m_{\mathrm{arr}}\gets
+            (e.\rho,i,\rho_s,i_s,j,e.\mathit{arrivalTS})$
+          \State \textbf{send} $\ArrivalTSResponse(m_{\mathrm{arr}})$
+            to $\ell_{i_s}$
+        \EndFor
+  
+        \State \Call{TryReady}{$e$}
+      \EndProcedure
+    \end{algorithmic}
+  \end{algorithm}
 
+
+
+  \begin{algorithm}[!tb]
+    \caption{Ellis\_CT Shard Leader: Predecessor Coordination}
+    \label{ellis-ct-leader-coordination}
+    \begin{algorithmic}[1]
+      \Procedure{\leaderSubmitCR}{$m_{\mathrm{cr}}$}
+        \State $(\rho_p,\rho_s,i_s,j)\gets m_{\mathrm{cr}}$
+        \State $e_p\gets E(\rho_p)$
+          \Comment{Predecessor operation}
+        \State $e_p.S\gets
+          e_p.S\cup\{(\rho_s,i_s,j)\}$
+  
+        \If{$e_p.\mathit{vr1Done}$}
+          \State $m_{\mathrm{arr}}\gets
+            (\rho_p,i,\rho_s,i_s,j,e_p.\mathit{arrivalTS})$
+          \State \textbf{send} $\ArrivalTSResponse(m_{\mathrm{arr}})$
+            to $\ell_{i_s}$
+        \EndIf
+  
+        \If{$e_p.\mathit{ready}$}
+          \State $m_{\mathrm{final}}\gets
+            (\rho_p,i,\rho_s,i_s,j)$
+          \State \textbf{send} $\FinalAck(m_{\mathrm{final}})$
+            to $\ell_{i_s}$
+        \EndIf
+      \EndProcedure
+  
+      \Procedure{\leaderArrivalTSResp}{$m_{\mathrm{arr}}$}
+        \State $(\rho_p,i_p,\rho_s,i_s,j,t_p)
+          \gets m_{\mathrm{arr}}$
+        \State $e_s\gets E(\rho_s)$
+          \Comment{Successor operation}
+        \State \textbf{assert} $e_s.P[j]=(\rho_p,i_p)$
+        \State $e_s.A[j]\gets t_p$
+          \Comment{Preserve client predecessor order}
+        \State \Call{TryReady}{$e_s$}
+      \EndProcedure
+  
+      \Procedure{\leaderFinalAck}{$m_{\mathrm{final}}$}
+        \State $(\rho_p,i_p,\rho_s,i_s,j)
+          \gets m_{\mathrm{final}}$
+        \State $e_s\gets E(\rho_s)$
+        \State \textbf{assert} $e_s.P[j]=(\rho_p,i_p)$
+        \State $e_s.F[j]\gets\mathsf{true}$
+        \State \Call{TryExecute}{}
+      \EndProcedure
+  
+      \Procedure{TryReady}{$e$}
+        \If{$e.\mathit{ready}
+          \lor \neg e.\mathit{vr1Done}
+          \lor \exists j:e.A[j]=\bot$}
+          \State \textbf{return}
+        \EndIf
+  
+        \State $K\gets e.m_{\mathrm{req}}.K$
+        \State $Q[K]\gets Q[K]\setminus\{e\}$
+          \Comment{Remove before changing its sort key}
+        \State $e.\mathit{finalTS}\gets
+          \max(e.\mathit{arrivalTS},\Call{\foldl}{e.A})$
+        \State $\mathit{lastReadyTS}[K]\gets
+          \max(\mathit{lastReadyTS}[K],
+               e.\mathit{finalTS}+1)$
+          \Comment{Advance the READY frontier monotonically}
+        \State $e.\mathit{ready}\gets\mathsf{true}$
+        \State $Q[K]\gets Q[K]\cup\{e\}$
+          \Comment{Reinsert by $(\mathit{finalTS},\rho)$}
+  
+        \For{$\mathrm{each}\;(\rho_s,i_s,j)\in e.S$}
+          \State $m_{\mathrm{final}}\gets
+            (e.\rho,i,\rho_s,i_s,j)$
+          \State \textbf{send} $\FinalAck(m_{\mathrm{final}})$
+            to $\ell_{i_s}$
+        \EndFor
+  
+        \State \Call{AppendReady}{$K$}
+      \EndProcedure
+    \end{algorithmic}
+  \end{algorithm}
+
+
+  \begin{algorithm}[!tb]
+    \caption{Ellis\_CT Shard Leader: Commit and Execution}
+    \label{ellis-ct-leader-commit-execute}
+    \begin{algorithmic}[1]
+      \Procedure{AppendReady}{$K$}
+        \While{$Q[K]\neq\emptyset
+          \land \min(Q[K]).\mathit{ready}$}
+          \State $e\gets\min(Q[K])$
+          \State $Q[K]\gets Q[K]\setminus\{e\}$
+            \Comment{Pop the per-key POQ head}
+          \State $e.\mathit{logIndex}\gets |C|$
+          \State $C\gets C\mathbin{\|}\langle e\rangle$
+            \Comment{Append to the shard-wide commit log}
+  
+          \State $m_{\mathrm{commit}}\gets
+            (e.\mathit{logIndex},
+             e.m_{\mathrm{req}},
+             e.\mathit{arrivalTS},
+             e.A,
+             e.\mathit{finalTS})$
+            \Comment{Operation and full timestamp chain}
+          \State \textbf{replicate} $m_{\mathrm{commit}}$
+            to $\mathcal{R}_i$
+            \Comment{Begin VR round 2}
+        \EndWhile
+      \EndProcedure
+  
+      \Procedure{\leaderVR2Quorum}{$b$}
+        \State $e\gets C[b]$
+        \State $e.\mathit{vr2Done}\gets\mathsf{true}$
+        \State \Call{TryExecute}{}
+      \EndProcedure
+  
+      \Procedure{TryExecute}{}
+        \While{$\mathit{nextExec}<|C|$}
+          \State $e\gets C[\mathit{nextExec}]$
+  
+          \If{$\neg e.\mathit{vr2Done}
+            \lor \exists j:\neg e.F[j]$}
+            \State \textbf{return}
+            \Comment{Execution barrier}
+          \EndIf
+  
+          \State $v\gets
+            \Call{Execute}{e.m_{\mathrm{req}}.\textit{Op},
+                           e.m_{\mathrm{req}}.K,
+                           e.m_{\mathrm{req}}.V}$
+          \State \textbf{send}
+            $\RequestReply(e.m_{\mathrm{req}},v)$
+            to $e$'s client
+          \State $\mathit{nextExec}\mathrel{+}=1$
+        \EndWhile
+      \EndProcedure
+    \end{algorithmic}
+  \end{algorithm}
 
 % \begin{algorithm}[!tb]
 %   \caption{Ellis\_CT Leader}
