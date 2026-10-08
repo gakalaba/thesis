@@ -25,13 +25,15 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
 
 \providecommand{\executeRetClie}{\textsc{executeAndSubmitOpReply}}
 
-\providecommand{\clientSubmit}{\textsc{Client::SendRequest}}
+\providecommand{\clientSubmit}{\textsc{Submit}}
 
 \providecommand{\leaderHandleAccept}{\textsc{Leader::AcceptRespRecv}}
 
 \providecommand{\leaderHandleFinalAccept}{\textsc{Leader::FinalAcceptRespRecv}}
 
-\providecommand{\clientWait}{\textsc{Client::AwaitRequest}}
+\providecommand{\clientWait}{\textsc{AwaitResponse}}
+\providecommand{\ReceiveAny}{\textsc{ReceiveAny}}
+\providecommand{\RequestReply}{\textsc{OperationResponse}}
 
 \providecommand{\Recover}{\textsc{NewLeader::Recover}}
 
@@ -43,11 +45,11 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
 
 \providecommand{\leaderSubmit}{\textsc{Leader::SubmitRequestRecv}}
 
-\providecommand{\clientToLeader}{\textsc{SubmitRequest}}
+\providecommand{\clientToLeader}{\textsc{OperationRequest}}
 
 \providecommand{\leaderSubmitCR}{\textsc{Leader::SubmitCoordinationRecv}}
 
-\providecommand{\clientToLeaderCR}{\textsc{SubmitCoordination}}
+\providecommand{\clientToLeaderCR}{\textsc{CoordinationRequest}}
 
 \providecommand{\leaderHandleArrivalAcks}{\textsc{Leader::SubmitArrivalTSRecv}}
 
@@ -394,51 +396,94 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{algorithm}[!tb]
-  \caption{Ellis\_CT Client}
-  \label{ellis-ct-clientprotocol}
-  \begin{algorithmic}[1]
-    \State $\mathcal{L} \gets \{...\}$ \Comment{Shard leaders}
-    \State $c \gets$ unique client ID
-    \State $\sigma[\cdot] \gets 0$ \Comment{Per-shard counters}
-    \State $D : (\mathsf{Rid}\times\mathsf{Shard}) \rightharpoonup \mathbb{N};\quad D \gets \emptyset$ \Comment{Outstanding dependencies}
-    \State $R : (\mathsf{Rid}\times\mathsf{Shard}) \rightharpoonup \mathsf{value};\quad R \gets \emptyset$ \Comment{Cached request results}
-    \Procedure{\clientSubmit}{\textit{*Op*}, K, V}
-      \State $\ell_i \in \mathcal{L} \gets shard\_leader(K)$
-      \State $r \gets (c \ll 32) + \sigma[i]$ \Comment{Unique request ID}
-      \State $\sigma[i] \mathrel{+}= 1$
-      \State $P \gets \mathrm{dom}(D)$ \Comment{Predecessors}
-      \For{$\mathrm{each}\ (r', \ell_{i'}) \in P$}
-        \State $m \gets (r', r, \ell_i)$
-        \State \textbf{send} $\clientToLeaderCR(m)$ to $\ell_{i'} \in \mathcal{L}$
+    \caption{Ellis\_CT Client}
+    \label{ellis-ct-clientprotocol}
+    \begin{algorithmic}[1]
+      \State $\mathcal{L}\gets\{\ldots\}$ \Comment{Shard leaders}
+      \State $c\gets$ unique client ID
+      \State $\sigma[\cdot]\gets 0$ \Comment{Per-shard request counters}
+  
+      \State $D:(\mathsf{Rid}\times\mathsf{Shard})
+        \rightharpoonup\mathbb{N};\quad D\gets\emptyset$
+        \Comment{Reference-counted dependencies}
+  
+      \State $\mathit{R}:
+        (\mathsf{Rid}\times\mathsf{Shard})
+        \rightharpoonup\mathsf{Value};
+        \quad\mathit{R}\gets\emptyset$
+        \Comment{Response cache}
+  
+      \Procedure{\clientSubmit}{\textit{Op,K,V}}
+        \State $i\gets\mathsf{shard}(K)$
+        \State $\ell_i\in\mathcal{L}
+          \gets\mathsf{shard\_leader}(i)$
+  
+        \State $\rho\gets(c\ll 32)+\sigma[i]$
+          \Comment{Per-shard request ID}
+        \State $\sigma[i]\mathrel{+}=1$
+  
+        \State $P\gets\mathrm{dom}(D)$
+          \Comment{Predecessors}
+  
+        \State $m_{\mathrm{req}}
+          \gets(\textit{Op},K,V,\rho,i,P)$
+        \State \textbf{send} $\clientToLeader(m_{\mathrm{req}})$
+          to $\ell_i\in\mathcal{L}$
+  
+        \For{$\mathrm{each}\ (\rho',i')\in P$}
+          \State $\ell_{i'}\in\mathcal{L}
+            \gets\mathsf{shard\_leader}(i')$
+          \State $m_{\mathrm{cr}}\gets(\rho',\rho,i)$
+          \State \textbf{send} $\clientToLeaderCR(m_{\mathrm{cr}})$
+            to $\ell_{i'}\in\mathcal{L}$
         \EndFor
-      \State $m \gets (\textit{Op}, K, V, r, P)$
-      \State \textbf{send} $\clientToLeader(m)$ to $\ell_{i} \in \mathcal{L}$
-      \State $D(r, \ell_{i}) \gets 0$ \Comment{Insert as future dependency}
-      \State $\forall x \in \mathrm{dom}(D):\ D(x) \mathrel{+}= 1$
-      \State \textbf{return} (r, $\ell_i$) \Comment{Return handle}
+  
+        \State $D(\rho,i)\gets 0$
+          \Comment{Insert as future dependency}
+        \State $\forall x\in\mathrm{dom}(D):
+          D(x)\mathrel{+}=1$
+          \Comment{Add references held by the new request}
+  
+        \State \textbf{return} $(\rho,i)$
       \EndProcedure
-    \Procedure{\clientWait}{r, $\ell_i$}
-      \If{$(r, \ell_i) \in \mathrm{dom}(R)$}
-        \State \textbf{return} $R(r,\ell_i)$
+  
+      \Procedure{\clientWait}{$\rho,i$}
+        \If{$(\rho,i)\in\mathrm{dom}(\mathit{R})$}
+          \State \textbf{return} $\mathit{R}(\rho,i)$
         \EndIf
-      \While{\textbf{true}}
-        \State \textbf{wait} receive $RequestReply(m', v)$
-        \For{$\mathrm{each}\ (r', \ell_{i'}) \in m'.P$}
-          \State $D(r', \ell_{i'}) \mathrel{-}= 1$
-          \If{$D(r', \ell_{i'}) = 0$}
-            \State $D \gets D \setminus \{(r', \ell_{i'})\}$\Comment{Remove dependency}
+  
+        \While{\textbf{true}}
+            \State \textbf{receive}
+              $\RequestReply(m_{\mathrm{resp}},v)$
+              \Comment{Blocking}
+  
+          \State $P^+\gets m_{\mathrm{resp}}.P
+            \cup
+            \{(m_{\mathrm{resp}}.\rho,m_{\mathrm{resp}}.i)\}$
+            \Comment{References released by response}
+  
+          \For{$\mathrm{each}\ (\rho',i')\in P^+$}
+            \State $D(\rho',i')\mathrel{-}=1$
+            \If{$D(\rho',i')=0$}
+              \State $D\gets D\setminus\{(\rho',i')\}$
+                \Comment{Remove unreferenced dependency}
             \EndIf
           \EndFor
-        \If{$(m'.r, m'.\ell_i) = (r, \ell_i)$}
-          \State \textbf{return} $v$
+  
+          \If{$(m_{\mathrm{resp}}.\rho,m_{\mathrm{resp}}.i)
+            =(\rho,i)$}
+            \State \textbf{return} $v$
           \Else
-          \State $R \gets R \cup \{(m'.r, m'.\ell_i) \mapsto v\}$ \Comment{Cache result}
+            \State $\mathit{R}
+              \gets\mathit{R}\cup
+              \{(m_{\mathrm{resp}}.\rho,m_{\mathrm{resp}}.i)
+              \mapsto v\}$
+              \Comment{Cache response value}
           \EndIf
         \EndWhile
       \EndProcedure
-  \end{algorithmic}
-\end{algorithm}
-
+    \end{algorithmic}
+  \end{algorithm}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
