@@ -112,7 +112,8 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
 \providecommand{\requestreply}{\textsc{RequestReply}}
 
 \providecommand{\commit}{\textsc{Commit}}
-\providecommand{\leaderVR1Quorum}{\textsc{VR1QuorumRecv}}
+\providecommand{\leaderVROneQuorum}{\textsc{VR1QuorumRecv}}
+\providecommand{\leaderVRTwoQuorum}{\textsc{VR2QuorumRecv}}
 \providecommand{\ArrivalTSResponse}{\textsc{ArrivalTSResponse}}
 \providecommand{\FinalAck}{\textsc{FinalAck}}
 \providecommand{\leaderFinalAck}{\textsc{FinalAckRecv}}
@@ -494,7 +495,7 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{algorithm}[!tb]
-    \caption{Ellis\_CT Shard Leader: State and Request Arrival}
+    \caption{Ellis\_CT Shard Leader: Request Arrival and Fault Tolerance}
     \label{ellis-ct-leader-timestamps}
     \begin{algorithmic}[1]
       \State $i\gets$ this shard
@@ -537,7 +538,7 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
           \Comment{Begin VR round 1}
       \EndProcedure
   
-      \Procedure{\leaderVR1Quorum}{$\rho$}
+      \Procedure{\leaderVROneQuorum}{$\rho$}
         \State $e\gets E(\rho)$
         \If{$e.\mathit{vr1Done}$}
           \State \textbf{return}
@@ -613,69 +614,6 @@ in predecessor-indexed slots.
           \Comment{Preserve client predecessor order}
         \State \Call{TryReady}{$e_s$}
       \EndProcedure
-  
-      \Procedure{\leaderFinalAck}{$h_p,h_s,\mathit{predIdx}$}
-        \State $(\rho_s,i_s)\gets h_s$
-        \State $e_s\gets E(\rho_s)$
-        \State \textbf{assert} $e_s.P[\mathit{predIdx}]=h_p$
-        \State $e_s.F[\mathit{predIdx}]\gets\mathsf{true}$
-        \State \Call{TryExecute}{}
-      \EndProcedure
-
-      \Procedure{AppendReady}{$K$}
-        \While{$\mathit{POQ}[K]\neq\emptyset
-          \land \mathit{POQ}[K].\mathsf{head}().\mathit{ready}$}
-          \State $e\gets\mathit{POQ}[K].\mathsf{popHead}()$
-            \Comment{Pop the per-key POQ head}
-          \State $e.\mathit{logIdx}\gets |C|$
-          \State $C.\mathsf{append}(e)$
-            \Comment{Append to the shard-wide commit log}
-  
-          \State $m_{\mathrm{commit}}\gets
-            (e.\mathit{logIdx},
-             e.m_{\mathrm{req}},
-             e.\mathit{arrivalTS},
-             e.A,
-             e.\mathit{finalTS})$
-          \State \textbf{replicate} $m_{\mathrm{commit}}$
-            to $\mathcal{R}_i$
-            \Comment{Begin VR round 2}
-        \EndWhile
-      \EndProcedure
-  
-      \Procedure{\leaderVR2Quorum}{$\mathit{logIdx}$}
-        \State $e\gets C[\mathit{logIdx}]$
-        \State $e.\mathit{vr2Done}\gets\mathsf{true}$
-        \State \Call{TryExecute}{}
-      \EndProcedure
-    \end{algorithmic}
-  \end{algorithm}
-
-
-  \begin{algorithm}[!tb]
-    \caption{Ellis\_CT Shard Leader: READYness and Execution Helpers}
-    \label{ellis-ct-leader-commit-execute}
-    \begin{algorithmic}[1]
-      
-      \Procedure{TryExecute}{}
-        \While{$\mathit{nextExec}<|C|$}
-          \State $e\gets C[\mathit{nextExec}]$
-  
-          \If{$\neg e.\mathit{vr2Done}\lor\mathsf{false}\in e.F$}
-            \State \textbf{return}
-            \Comment{Execution barrier}
-          \EndIf
-  
-          \State $v\gets
-            \Call{Execute}{e.m_{\mathrm{req}}.\textit{Op},
-                           e.m_{\mathrm{req}}.K,
-                           e.m_{\mathrm{req}}.V}$
-          \State \textbf{send}
-            $\RequestReply(e.m_{\mathrm{req}},v)$
-            to $e$'s client
-          \State $\mathit{nextExec}\mathrel{+}=1$
-        \EndWhile
-      \EndProcedure
 
       \Procedure{TryReady}{$e$}
         \If{$e.\mathit{ready}$}
@@ -702,9 +640,70 @@ in predecessor-indexed slots.
         \For{$\mathrm{each}\;(h_s, \mathit{predIdx})\in e.S$}
             \State \textbf{send} $\FinalAck(h_p, h_s, \mathit{predIdx})$
             to $\ell_{h_s.i}$
-      \EndFor
-      \State \Call{AppendReady}{$K$}
-    \EndProcedure
+        \EndFor
+        \State \Call{AppendReady}{$K$}
+      \EndProcedure
+
+      \Procedure{AppendReady}{$K$}
+        \While{$\mathit{POQ}[K]\neq\emptyset
+          \land \mathit{POQ}[K].\mathsf{head}().\mathit{ready}$}
+          \State $e\gets\mathit{POQ}[K].\mathsf{popHead}()$
+            \Comment{Pop the per-key POQ head}
+          \State $e.\mathit{logIdx}\gets |C|$
+          \State $C.\mathsf{append}(e)$
+            \Comment{Append to the shard-wide commit log}
+  
+          \State $m_{\mathrm{commit}}\gets
+            (e.\mathit{logIdx},
+             e.m_{\mathrm{req}},
+             e.\mathit{arrivalTS},
+             e.A,
+             e.\mathit{finalTS})$
+          \State \textbf{replicate} $m_{\mathrm{commit}}$
+            to $\mathcal{R}_i$
+            \Comment{Begin VR round 2}
+        \EndWhile
+      \EndProcedure
+  
+      \Procedure{\leaderVRTwoQuorum}{$\mathit{logIdx}$}
+        \State $e\gets C[\mathit{logIdx}]$
+        \State $e.\mathit{vr2Done}\gets\mathsf{true}$
+        \State \Call{TryExecute}{}
+      \EndProcedure
+    \end{algorithmic}
+  \end{algorithm}
+
+
+  \begin{algorithm}[!tb]
+    \caption{Ellis\_CT Shard Leader: READYness and Execution Helpers}
+    \label{ellis-ct-leader-commit-execute}
+    \begin{algorithmic}[1]
+      \Procedure{\leaderFinalAck}{$h_p,h_s,\mathit{predIdx}$}
+        \State $(\rho_s,i_s)\gets h_s$
+        \State $e_s\gets E(\rho_s)$
+        \State \textbf{assert} $e_s.P[\mathit{predIdx}]=h_p$
+        \State $e_s.F[\mathit{predIdx}]\gets\mathsf{true}$
+        \State \Call{TryExecute}{}
+      \EndProcedure
+      \Procedure{TryExecute}{}
+        \While{$\mathit{nextExec}<|C|$}
+          \State $e\gets C[\mathit{nextExec}]$
+  
+          \If{$\neg e.\mathit{vr2Done}\lor\mathsf{false}\in e.F$}
+            \State \textbf{return}
+            \Comment{Execution barrier}
+          \EndIf
+  
+          \State $v\gets
+            \Call{Execute}{e.m_{\mathrm{req}}.\textit{Op},
+                           e.m_{\mathrm{req}}.K,
+                           e.m_{\mathrm{req}}.V}$
+          \State \textbf{send}
+            $\RequestReply(e.m_{\mathrm{req}},v)$
+            to $e$'s client
+          \State $\mathit{nextExec}\mathrel{+}=1$
+        \EndWhile
+      \EndProcedure
 
     \Function{\foldl}{$A$}
         \If{$|A|=0$}
@@ -887,47 +886,47 @@ in predecessor-indexed slots.
 
 %%%%%%%%%%%% OPTIMIZATIONS????
 
-\begin{algorithm}[!tb]
-  \caption{IOCL Leader Coordination}
-  \label{shardprotocolcoord}
-  \begin{algorithmic}[1]
-    \Procedure{\leaderSubmitCR}{\textit{*pred*}, \textit{*req*}}
-      \Statex \Comment{CR sent by client of req to shard carrying req's predecessor}
-      \State $pred.\mathrm{succrq} := \textit{req}$
-      \If{$\textit{entry} := \textit{orderedLog}\find(\textit{pred}) \neq \textit{NULL}$}
-        \State $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{seqno}, entry.\mathrm{my\_arrival\_ts}$ to $L\_{req} \in \mathcal{L}$
-        \State \textbf{return}
-        \EndIf
-      \State \textbf{wait} $\textit{entry} := \textit{bufferedMap}\find(\textit{pred}) \neq \textit{NULL}$
-      \State \textbf{wait} $(entry.\mathrm{committed})$
-      \State $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{seqno}, entry.\mathrm{my\_arrival\_ts})$ to $L\_{req} \in \mathcal{L}$
-      \EndProcedure
-    \Procedure{\CRReply}{\textit{*req*}, \textit{*i*}, arrival\_ts}
-      \State \textbf{wait} $entry := bufferedMap\find{req} \neq NULL$
-      \State $entry.\mathrm{pracks}\mathrel{+}= 1$
-      \State $entry.\mathrm{pred\_ts}[i] = \mathrm{arrival\_ts}$
-      \If{$entry.\mathrm{pracks} == entry.\mathrm{preds}$}
-        \State $entry.\mathrm{coordinated} \gets \textit{True}$
-        \EndIf
-      \If{$entry.\mathrm{committed} \land entry.\mathrm{coordinated}$}
-        \State $entry.\mathrm{my\_sort\_ts} \gets \textit{foldl}(entry.\mathrm{pred\_ts})$
-        \State $\textit{bufferedMap}\pop(\textit{entry})$
-        \State $\textit{sortedTempLog}\insertSorted(\textit{entry})$
-        \State $\textit{SubmitCRAckResp}(entry.\mathrm{my\_sort\_ts}, \textit{req}, entry.\mathrm{succrq})$ to $L\_{succrq} \in \mathcal{L}$
-        \EndIf
-      \EndProcedure
-    \Procedure{\CRAckReply}{\textit{*ts*}, \textit{*pred*}, \textit{*req*}}
-      \State \textbf{wait} $entry := sortedTempLog\find{req} \neq NULL$
-      \State \textbf{wait} $sortedTempLog.hd() == entry$
-      \State $\textit{sortedTempLog}\pop(\textit{entry})$
-      \State $\textit{orderedLog}\append(\textit{entry})$
-      \State $entry.\mathrm{my\_ts} \gets \mathrm{max}(ShardTS, entry.\mathrm{my\_sort\_ts})$
-      \State $\mathrm{ShardTS} \gets entry.\mathrm{my\_ts} + 1$
-      \State $\mathrm{Running\_ShardTS} \gets \mathrm{ShardTS}$
-      \State \textbf{send} $\textit{FinalAccept}(\textit{entry})$ to all $r \in \mathcal{R}$
-      \EndProcedure
-  \end{algorithmic}
-\end{algorithm}
+% \begin{algorithm}[!tb]
+%   \caption{IOCL Leader Coordination}
+%   \label{shardprotocolcoord}
+%   \begin{algorithmic}[1]
+%     \Procedure{\leaderSubmitCR}{\textit{*pred*}, \textit{*req*}}
+%       \Statex \Comment{CR sent by client of req to shard carrying req's predecessor}
+%       \State $pred.\mathrm{succrq} := \textit{req}$
+%       \If{$\textit{entry} := \textit{orderedLog}\find(\textit{pred}) \neq \textit{NULL}$}
+%         \State $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{seqno}, entry.\mathrm{my\_arrival\_ts}$ to $L\_{req} \in \mathcal{L}$
+%         \State \textbf{return}
+%         \EndIf
+%       \State \textbf{wait} $\textit{entry} := \textit{bufferedMap}\find(\textit{pred}) \neq \textit{NULL}$
+%       \State \textbf{wait} $(entry.\mathrm{committed})$
+%       \State $\textit{SubmitCRResp}(\textit{req}, entry.\mathrm{seqno}, entry.\mathrm{my\_arrival\_ts})$ to $L\_{req} \in \mathcal{L}$
+%       \EndProcedure
+%     \Procedure{\CRReply}{\textit{*req*}, \textit{*i*}, arrival\_ts}
+%       \State \textbf{wait} $entry := bufferedMap\find{req} \neq NULL$
+%       \State $entry.\mathrm{pracks}\mathrel{+}= 1$
+%       \State $entry.\mathrm{pred\_ts}[i] = \mathrm{arrival\_ts}$
+%       \If{$entry.\mathrm{pracks} == entry.\mathrm{preds}$}
+%         \State $entry.\mathrm{coordinated} \gets \textit{True}$
+%         \EndIf
+%       \If{$entry.\mathrm{committed} \land entry.\mathrm{coordinated}$}
+%         \State $entry.\mathrm{my\_sort\_ts} \gets \textit{foldl}(entry.\mathrm{pred\_ts})$
+%         \State $\textit{bufferedMap}\pop(\textit{entry})$
+%         \State $\textit{sortedTempLog}\insertSorted(\textit{entry})$
+%         \State $\textit{SubmitCRAckResp}(entry.\mathrm{my\_sort\_ts}, \textit{req}, entry.\mathrm{succrq})$ to $L\_{succrq} \in \mathcal{L}$
+%         \EndIf
+%       \EndProcedure
+%     \Procedure{\CRAckReply}{\textit{*ts*}, \textit{*pred*}, \textit{*req*}}
+%       \State \textbf{wait} $entry := sortedTempLog\find{req} \neq NULL$
+%       \State \textbf{wait} $sortedTempLog.hd() == entry$
+%       \State $\textit{sortedTempLog}\pop(\textit{entry})$
+%       \State $\textit{orderedLog}\append(\textit{entry})$
+%       \State $entry.\mathrm{my\_ts} \gets \mathrm{max}(ShardTS, entry.\mathrm{my\_sort\_ts})$
+%       \State $\mathrm{ShardTS} \gets entry.\mathrm{my\_ts} + 1$
+%       \State $\mathrm{Running\_ShardTS} \gets \mathrm{ShardTS}$
+%       \State \textbf{send} $\textit{FinalAccept}(\textit{entry})$ to all $r \in \mathcal{R}$
+%       \EndProcedure
+%   \end{algorithmic}
+% \end{algorithm}
 
 
 
