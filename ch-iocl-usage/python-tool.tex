@@ -422,7 +422,7 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
         \State $\sigma[i]\mathrel{+}=1$
   
         \State $P\gets\langle\mathsf{keys}(D)\rangle$
-            \Comment{Invocation Ordered predecessors}
+            \Comment{Invocation-Ordered predecessors}
   
         \State $m_{\mathrm{req}}
           \gets(\textit{Op},K,V,\rho,i,P)$
@@ -495,7 +495,7 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{algorithm}[!tb]
-    \caption{Ellis\_CT Shard Leader: Request Arrival and Fault Tolerance}
+    \caption{Ellis\_CT Shard Leader: Request Arrival}
     \label{ellis-ct-leader-timestamps}
     \begin{algorithmic}[1]
       \State $i\gets$ this shard
@@ -579,7 +579,7 @@ in predecessor-indexed slots.
 
 
   \begin{algorithm}[!tb]
-    \caption{Ellis\_CT Shard Leader: Coordination and Commit Processing}
+    \caption{Ellis\_CT Shard Leader: Request Coordination and Commit}
     \label{ellis-ct-leader-coordination}
     \begin{algorithmic}[1]
       \Procedure{\leaderSubmitCR}{$h_p,h_s,\mathit{predIdx}$}
@@ -675,7 +675,7 @@ in predecessor-indexed slots.
 
 
   \begin{algorithm}[!tb]
-    \caption{Ellis\_CT Shard Leader: READYness and Execution Helpers}
+    \caption{Ellis\_CT Shard Leader: Request Execution}
     \label{ellis-ct-leader-commit-execute}
     \begin{algorithmic}[1]
       \Procedure{\leaderFinalAck}{$h_p,h_s,\mathit{predIdx}$}
