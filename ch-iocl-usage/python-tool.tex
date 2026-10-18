@@ -517,6 +517,8 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
         \Comment{Shard-wide commit log}
       \State $\mathit{nextExec}\gets 0$
         \Comment{Next commit-log index to execute}
+      \State $\mathit{fackSendQ}[\cdot]\gets\emptyset$
+        \Comment{Per-key waiters for sending final ACKs}
 
       \Procedure{\leaderSubmit}{$m_{\mathrm{req}}$}
         \State $(\textit{Op},K,V,\rho,i_{\mathrm{req}},P)\gets m_{\mathrm{req}}$
@@ -531,6 +533,8 @@ The pseudocode for failover for \ect{} and \elin{} is shown in \cref{ellis-ct-re
           \Comment{Registered successors}
         \State $e.\mathit{vr1Done}\gets\mathsf{false}$
         \State $e.\mathit{ready}\gets\mathsf{false}$
+        \State $e.\mathit{canAck}\gets\mathsf{false}$
+          \Comment{Required for real-time guarantees}
         \State $e.\mathit{vr2Done}\gets\mathsf{false}$
         \State $e.\mathit{logIdx}\gets\bot$
         \State $E(\rho)\gets e$
@@ -597,7 +601,7 @@ in predecessor-indexed slots.
             to $\ell_{h_s.i}$
         \EndIf
   
-        \If{$e_p.\mathit{ready}$}
+        \If{$e_p.\mathit{canAck}$}
           \State \textbf{send}
             $\FinalAck(
               h_p,h_s,\mathit{predIdx})$
@@ -635,12 +639,6 @@ in predecessor-indexed slots.
         \State $e.\mathit{ready}\gets\mathsf{true}$
         \State $\mathit{POQ}[K].\mathsf{insertSorted}(e)$
             \Comment{Reinsert by $(\mathit{finalTS},\rho)$}
-
-        \State $h_p\gets(e.\rho,i)$
-        \For{$\mathrm{each}\;(h_s, \mathit{predIdx})\in e.S$}
-            \State \textbf{send} $\FinalAck(h_p, h_s, \mathit{predIdx})$
-            to $\ell_{h_s.i}$
-        \EndFor
         \State \Call{AppendReady}{$K$}
       \EndProcedure
 
@@ -652,7 +650,19 @@ in predecessor-indexed slots.
           \State $e.\mathit{logIdx}\gets |C|$
           \State $C.\mathsf{append}(e)$
             \Comment{Append to the shard-wide commit log}
-  
+          \If{$fackSendQ[K] \neq \emptyset$}
+            \State $fackSendQ[K].\mathsf{append}(e)$
+          \Else
+            \State $e.\mathit{canAck}\gets\mathsf{true}$
+            \State $h_p\gets(e.\rho,i)$
+            \For{$\mathrm{each}\;(h_s, \mathit{predIdx})\in e.S$}
+                \State \textbf{send} $\FinalAck(h_p, h_s, \mathit{predIdx})$
+                to $\ell_{h_s.i}$
+            \EndFor
+            \If{$\mathsf{false}\in e.F$}
+                \State $fackSendQ[K].\mathsf{append}(e)$
+            \EndIf
+          \EndIf
           \State $m_{\mathrm{commit}}\gets
             (e.\mathit{logIdx},
              e.m_{\mathrm{req}},
@@ -683,13 +693,33 @@ in predecessor-indexed slots.
         \State $e_s\gets E(\rho_s)$
         \State \textbf{assert} $e_s.P[\mathit{predIdx}]=h_p$
         \State $e_s.F[\mathit{predIdx}]\gets\mathsf{true}$
+        \State $K\gets e_s.m_{\mathrm{req}}.K$
+        \State $hd\gets fackSendQ[K].\mathsf{head}()$
+        \If{$e_s=hd\land\mathsf{false}\notin e_s.F$}
+            \Comment{Check to send final ACKs to successors}
+            \While{$hd \neq \varnothing \land \mathsf{false}\notin hd.F$}
+                \State $fackSendQ[K].\mathsf{popHead}()$
+                \If{$fackSendQ[K] = \emptyset$}
+                    \State \textbf{break}
+                \EndIf
+                \State $next\_hd\gets fackSendQ[K].\mathsf{head}()$
+                \State $next\_hd.\mathit{canAck}\gets\mathsf{true}$
+                  \Comment{Met when log prefix is fully ACKd}
+                \State $h_p\gets(next\_hd.\rho,i)$
+                \For{$\mathrm{each}\;(h_s, \mathit{predIdx})\in next\_hd.S$}
+                    \State \textbf{send} $\FinalAck(h_p, h_s, \mathit{predIdx})$
+                    to $\ell_{h_s.i}$
+                \EndFor
+                \State $hd\gets next\_hd$
+            \EndWhile
+        \EndIf
         \State \Call{TryExecute}{}
       \EndProcedure
       \Procedure{TryExecute}{}
         \While{$\mathit{nextExec}<|C|$}
           \State $e\gets C[\mathit{nextExec}]$
   
-          \If{$\neg e.\mathit{vr2Done}\lor\mathsf{false}\in e.F$}
+          \If{$\neg e.\mathit{vr2Done}\lor\mathsf{false}\in e.F \lor \neg \mathit{e.canAck}$}
             \State \textbf{return}
             \Comment{Execution barrier}
           \EndIf
