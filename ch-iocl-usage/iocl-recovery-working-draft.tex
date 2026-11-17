@@ -1,0 +1,381 @@
+\section{Recovery Protocol and Proof}
+
+\providecommand{\Hole}{\mathsf{HOLE}}
+\providecommand{\Proposed}{\mathsf{PROPOSED}}
+\providecommand{\Accepted}{\mathsf{ACCEPTED}}
+\providecommand{\Resolved}{\mathsf{RESOLVED}}
+\providecommand{\Historical}{\mathsf{historical}}
+\providecommand{\Replacement}{\mathsf{replacement}}
+\providecommand{\Recovering}{\mathsf{recovering}}
+\providecommand{\Normal}{\mathsf{normal}}
+\providecommand{\owner}{\mathsf{owner}}
+\providecommand{\arr}{\mathit{arrivalTS}}
+\providecommand{\fin}{\mathit{finalTS}}
+\providecommand{\lready}{\mathit{lastReadyTS}}
+
+\noindent\textbf{Status.} A concrete candidate for analysis, not a proved
+failover protocol. This listing covers recovery only. It adds no normal-path
+replication round, no pre-round-1 POQ reservation, and no requirement that normal
+final ACKs wait for round 2. Repeated-failure safety and reconstructed-POQ safety
+remain proof obligations. No recovery-specific durable decision record is assumed.
+
+\paragraph{Inputs and notation.}
+At shard $i$, $C_i$ is the ordered log selected by the underlying view-change
+protocol, $U_i$ its selected unordered bag, and $W_i=U_i\setminus C_i$ the pending
+owned operations. Log selection must preserve the underlying replication
+protocol's guarantees; arbitrary union of conflicting logs is not assumed.
+Handles include owner identity. $N$ counts cluster shards; $p,P,m,S$ count
+predecessor operations, predecessor shards, successor operations, and successor
+shards. Historical evidence includes local request entries, predecessor-arrival
+arrays, valid retained buffers, and retained compaction metadata. Rejected stale
+messages do not become evidence merely by being buffered.
+
+For every relevant handle $o$, keep $b[o]=(state,t,origin,\pi)$, with states
+$\Hole,\Proposed,\Accepted,\Resolved$. Only resolved bindings are usable.
+The origin is historical or agreed replacement. Use symmetric sets
+\[
+ \mathcal R=\{o:b[o].state=\Resolved\},\qquad
+ \mathcal U=\{o:b[o].state\ne\Resolved\},\qquad
+ \mathcal K=\{o\in\mathcal R:b[o].origin=\Historical\}.
+\]
+Known is the historical subset of Resolved. Proposed and Accepted remain
+Unresolved. Foreign handles represent dependency information and never enter
+local POQs. Initial response sets $V_o,H_o,N_o$ contain distinct respondents
+returning VALUE, HOLE, and NOPE, respectively. Inspect local evidence separately.
+
+\begin{center}
+\begin{tabular}{lll}
+\textbf{Recovery term} & \textbf{Message} & \textbf{2PC analogy}\\\hline
+Owner & -- & Coordinator\\
+Hole respondent & -- & Participant\\
+Candidate & $TENTATIVE(o,\pi,t)$ & Prepare\\
+Acceptance & $ACCEPT(o,\pi,t)$ & Yes vote\\
+Historical counter-evidence & $COUNTER(o,\pi,t_{old})$ & Reject with evidence\\
+Resolution & $RESOLVE(o,\pi,t,kind)$ & Decision/commit\\
+\end{tabular}
+\end{center}
+This is a mapping of concepts, not an invocation of a complete crash-safe 2PC
+implementation. Rejecting a candidate does not abort the client operation.
+
+\paragraph{Attempts and views.}
+Every cross-shard envelope identifies its sender and installed view.
+An inquiry names the requester's recovery attempt $r=(i,v_i,\eta)$; a proposal
+has identifier $\pi=(\owner(o),v_{\owner(o)},\eta,k)$. Responses name the
+inquiry/proposal they answer. Match values and identities as well as identifiers.
+Replies and votes are counted by distinct current sender incarnation.
+All handlers serialize with local normal-protocol transitions.
+
+\begin{algorithm}[p]
+\caption{View filtering and dispatch}
+\begin{algorithmic}[1]
+\Procedure{Receive}{$j,v,m$}
+  \If{$knownView[j]\ne\bot\land v<knownView[j]$}
+    \State \textbf{return}
+  \EndIf
+  \If{$knownView[j]=\bot\lor v>knownView[j]$}
+    \State $knownView[j]\gets v$
+    \State Invalidate unfinished reply/vote counts from older incarnations of $j$
+    \State Requery live collections or resend the current proposal as needed
+    \State Invalidate uncommitted proposals owned by $j$ in older views
+    \State Retain resolved bindings and their historical evidence
+  \EndIf
+  \If{$m$ is a recovery control message}
+    \State Dispatch the matching handler, even while recovering
+  \ElsIf{$mode=\Recovering$}
+    \State Buffer $m$ without READY, append, ACK release, or execution
+  \Else
+    \State Invoke the original normal handler
+  \EndIf
+\EndProcedure
+\Statex Higher-view messages update the map and are processed normally by type.
+\Statex Unknown views are not zero. Own view allocation uses the base view-change
+\Statex protocol; incrementing an arbitrary stale replica counter is insufficient.
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[p]
+\caption{Install state and begin collection}
+\begin{algorithmic}[1]
+\Procedure{BeginRecovery}{}
+  \State $mode\gets\Recovering$; $initialDone\gets\mathsf{false}$
+  \State Disable normal effects and POQ draining
+  \State Install a new own view $v_i$; $r\gets(i,v_i,\Call{FreshId}{})$
+  \State Reset volatile reply counts, proposals, subscriptions, and remote-view knowledge
+  \State Install selected $U_i,C_i$, snapshot, and retained metadata
+  \State Extract historical arrival bindings; mark them resolved with historical origin
+  \State $W_i\gets U_i\setminus C_i$
+  \State Register missing owned bindings and predecessor bindings as holes
+  \For{each key $K$}
+    \State $\lready[K]\gets\max(\{0\}\cup\{e.\fin+1:e\in C_i,e.K=K\})$
+  \EndFor
+  \State $shardTS\gets\max(\{0\}\cup\{e.\fin+1:e\in C_i\})$
+  \For{each shard $j\ne i$}
+    \State \textbf{send} $SEARCH(r,W_i)$ to $j$
+  \EndFor
+  \For{each distinct predecessor $q$ whose binding is needed}
+    \State \textbf{send} $LOOKUP(r,q)$ to $\owner(q)$, or handle locally
+    \State Report locally held historical evidence for $q$ to its owner
+  \EndFor
+  \State Await every initial SEARCH and LOOKUP reply; HOLE counts as an initial reply
+\EndProcedure
+\Statex Inquiries establish view fences. Answers wait for local state installation,
+\Statex never for the responder's global recovery. Log scanning can run in parallel
+\Statex with collection. No cluster-wide quorum substitutes for contacting every shard.
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[p]
+\caption{Immediate local answers and subscriptions}
+\begin{algorithmic}[1]
+\Function{LocalAnswer}{$o$}
+  \If{a resolved binding or retained historical value for $a(o)$ exists}
+    \State \Return $VALUE(o,t)$
+  \ElsIf{$mode=\Recovering$ and this recovery is seeking exactly $a(o)$}
+    \State \Return $HOLE(o)$
+  \Else
+    \State \Return $NOPE(o)$
+  \EndIf
+\EndFunction
+\Statex
+\Procedure{OnSearch}{$j,r_j,W$}
+  \State Apply the view fence and ensure selected local state is installed
+  \For{each $o\in W$}
+    \State $ans[o]\gets\Call{LocalAnswer}{o}$
+    \If{$ans[o]=HOLE(o)$}
+      \State Register $(j,r_j)$ as waiting for evidence/resolution about $o$
+    \EndIf
+  \EndFor
+  \State \textbf{send} $SEARCHREPLY(r_j,ans)$ to $j$
+\EndProcedure
+\Statex
+\Procedure{OnLookup}{$j,r_j,o$}
+  \State \textbf{assert} $\owner(o)=i$; ensure selected local state is installed
+  \State $ans\gets\Call{LocalAnswer}{o}$
+  \If{$ans=HOLE(o)$}
+    \State Add $(j,r_j)$ to $waiters[o]$
+  \EndIf
+  \State \textbf{send} $LOOKUPREPLY(r_j,ans)$ to $j$
+\EndProcedure
+\Statex Proposed/accepted candidates never generate VALUE replies.
+\Statex SEARCH requests owned bindings only; predecessor LOOKUPs go to their owners.
+\Statex Evidence found independently at a nonowner is routed to the owner.
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[p]
+\caption{Initial collection and candidate selection}
+\begin{algorithmic}[1]
+\Procedure{OnInitialReply}{$j,r_j,answers$}
+  \If{$r_j\ne r$}
+    \State \textbf{return}
+  \EndIf
+  \State Count the matching inquiry reply from the current sender incarnation
+  \State Classify owned-operation answers into $V_o,H_o,N_o$
+  \State Invoke HistoricalValue for owned VALUE replies; assert resolved-value agreement
+  \State Owner LOOKUP replies resolve corresponding dependency bindings
+  \If{all initial inquiry replies have arrived and $\neg initialDone$}
+    \State $initialDone\gets\mathsf{true}$
+    \For{each $o\in W_i$}
+      \If{$o\in\mathcal R$}
+        \State \Call{NotifyWaiters}{$o$}
+      \Else
+        \State $t\gets\max(shardTS,\lready[o.K])$; $shardTS\gets t+1$
+        \State $\pi\gets(i,v_i,r.\eta,\Call{NextProposal}{o})$
+        \State $b[o]\gets(\Proposed,t,\Replacement,\pi)$
+        \State $participants[o]\gets H_o$
+        \State \textbf{send} $TENTATIVE(o,\pi,t)$ to all participants
+        \State \Call{TryResolve}{$o$}
+      \EndIf
+    \EndFor
+    \State Process buffered TENTATIVE messages
+  \EndIf
+\EndProcedure
+\Statex Initial response sets are historical classifications, not permanent binding states.
+\Statex Preserve recovered values exactly; do not raise them to replacement floors.
+\Statex Predecessor arrivals affect finalTS through the original ordered fold;
+\Statex normal arrivalTS need not exceed predecessor arrivals.
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[p]
+\caption{Historical evidence and owner-mediated dissemination}
+\begin{algorithmic}[1]
+\Procedure{HistoricalValue}{$o,t$}
+  \If{$o\in\mathcal R$}
+    \State \textbf{assert} $b[o].t=t$; \textbf{return}
+  \EndIf
+  \State Cancel any uncommitted conflicting candidate
+  \State $b[o]\gets(\Resolved,t,\Historical,\bot)$
+  \If{$\owner(o)=i$}
+    \State \textbf{send} historical $RESOLVE$ to every prior proposal recipient
+    \State Use the applicable current owner attempt/proposal identifiers
+    \State \Call{NotifyWaiters}{$o$}
+  \Else
+    \State \textbf{send} $EVIDENCE(o,t,\text{owner attempt})$ to $\owner(o)$
+  \EndIf
+\EndProcedure
+\Statex
+\Procedure{NotifyWaiters}{$o$}
+  \State \textbf{assert} $\owner(o)=i\land o\in\mathcal R$
+  \For{each live subscription $(j,r_j)$ for $o$}
+    \State \textbf{send} $OWNER\_VALUE(o,b[o].t,r_j)$ to $j$
+  \EndFor
+\EndProcedure
+\Statex
+\Procedure{OnEvidence}{$j,o,t,r_j$}
+  \State \textbf{assert} $\owner(o)=i$; match the current owner collection/attempt
+  \State \Call{HistoricalValue}{$o,t$}
+\EndProcedure
+\Statex
+\Procedure{OnOwnerValue}{$j,o,t,r_j$}
+  \State \textbf{assert} $j=\owner(o)$; match a live local lookup subscription
+  \If{$o\in\mathcal R$}
+    \State \textbf{assert} $b[o].t=t$
+  \Else
+    \State Discard an uncommitted candidate and record the owner's resolved binding
+  \EndIf
+\EndProcedure
+\Statex Resolving a historical HOLE also requires notification; discovering a value
+\Statex locally is not sufficient to unblock its requesters. Nonowners send evidence
+\Statex to the owner rather than broadcasting competing decisions.
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[p]
+\caption{Participant handling of a tentative candidate}
+\begin{algorithmic}[1]
+\Procedure{OnTentative}{$j,o,\pi,t$}
+  \State \textbf{assert} $j=\owner(o)\ne i$; reject obsolete owner attempts/proposals
+  \If{$\neg initialDone$}
+    \State Buffer until initial collection completes; \textbf{return}
+  \EndIf
+  \If{$o\in\mathcal R$}
+    \State \textbf{send} $COUNTER(o,\pi,b[o].t)$ to $j$; \textbf{return}
+  \EndIf
+  \State A duplicate acceptance must name the same proposal and candidate
+  \State $b[o]\gets(\Accepted,t,\Replacement,\pi)$
+  \State \textbf{send} $ACCEPT(o,\pi,t)$ to $j$
+  \State Keep the binding unresolved and unusable; further inquiries receive HOLE
+\EndProcedure
+\Statex
+\Procedure{OnCounter}{$j,o,\pi,t_{old}$}
+  \State Match the current proposal or corresponding historical evidence inquiry
+  \State \Call{HistoricalValue}{$o,t_{old}$}
+\EndProcedure
+\Statex If historical evidence is discovered after ACCEPT but before RESOLVE,
+\Statex send COUNTER immediately. Proving that such evidence cannot invalidate
+\Statex a racing owner decision is a safety obligation of this candidate protocol.
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[p]
+\caption{Owner decision and resolution receipt}
+\begin{algorithmic}[1]
+\Procedure{OnAccept}{$j,o,\pi,t$}
+  \If{$b[o].state\ne\Proposed$ or proposal/value does not match}
+    \State \textbf{return}
+  \EndIf
+  \State Record acceptance by $j$'s current incarnation
+  \State \Call{TryResolve}{$o$}
+\EndProcedure
+\Statex
+\Procedure{TryResolve}{$o$}
+  \If{$b[o].state\ne\Proposed$}
+    \State \textbf{return}
+  \EndIf
+  \If{some participant has not accepted this exact proposal}
+    \State \textbf{return}
+  \EndIf
+  \State $(t,\pi)\gets(b[o].t,b[o].\pi)$
+  \State $b[o]\gets(\Resolved,t,\Replacement,\pi)$
+  \State \textbf{send} $RESOLVE(o,\pi,t,\Replacement)$ to every participant
+  \State \Call{NotifyWaiters}{$o$}
+\EndProcedure
+\Statex
+\Procedure{OnResolve}{$j,o,\pi,t,kind$}
+  \State \textbf{assert} $j=\owner(o)$; match a current owner attempt
+  \If{$o\in\mathcal R$}
+    \State \textbf{assert} $b[o].t=t$; \textbf{return}
+  \EndIf
+  \If{$kind=\Replacement$}
+    \State Require matching ACCEPTED proposal; otherwise obtain current owner resolution
+  \EndIf
+  \State Historical resolution may override an uncommitted candidate
+  \State $b[o]\gets(\Resolved,t,kind,\pi)$
+\EndProcedure
+\Statex Current OWNER\_VALUE notifications also resolve matching lookup subscriptions.
+\Statex Conflicting resolved values are invariant violations, not overwrite cases.
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[p]
+\caption{Candidate POQ reconstruction and resumption}
+\begin{algorithmic}[1]
+\Procedure{TryRebuild}{}
+  \If{$\neg initialDone$ or some required binding remains unresolved}
+    \State \textbf{return}
+  \EndIf
+  \State Preserve $C_i$ and all stored timestamps and predecessor evidence
+  \State Clear pending POQs; keep draining disabled
+  \For{each owned $o\in W_i$}
+    \State $e.\arr\gets b[o].t$; $e.\fin\gets e.\arr$
+    \State Fill $e.A$ in original predecessor order from resolved bindings
+    \State $e.ready\gets\mathsf{false}$; insert $e$ into $POQ[e.K]$
+  \EndFor
+  \For{each pending $e$}
+    \State Remove $e$ before changing its sort key
+    \State $e.\fin\gets\max(e.\arr,\Call{OriginalFold}{e.A})$
+    \State $e.ready\gets\mathsf{true}$
+    \State $\lready[e.K]\gets\max(\lready[e.K],e.\fin+1)$
+    \State Reinsert by $(e.\fin,e.\rho)$
+  \EndFor
+  \State Reset unknown predecessor-ACK receipts; rebuild per-key ACK wait queues
+  \State Re-register dependencies and request predecessor final ACKs
+  \State Enable normal POQ head draining and original round-2 replication
+  \State Process buffered operational messages through view filtering
+  \State Recompute ACK eligibility with the original same-key prefix condition
+  \State Restore/replay from a consistent snapshot and applied prefix
+  \State Deduplicate requests and preserve/reconstruct prior response values
+  \State Resume original execution barriers and replies; $mode\gets\Normal$
+\EndProcedure
+\Statex The reconstruction is the proposed algorithm, not an assumed POQSafe oracle.
+\Statex Its prefix and historical-ACK compatibility are to be tested and proved.
+\Statex POQs on distinct shards need not be equal or globally sorted together.
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Failures during recovery.}
+Restart from selected replicated state after another failover. Surviving resolved
+bindings return VALUE; proposed or accepted-but-unresolved bindings return HOLE
+when being recovered. A newer owner view invalidates old uncommitted proposals,
+not retained resolved evidence. Obsolete replies cannot satisfy new collections.
+A learned newer participant incarnation invalidates its old unfinished vote.
+Owners that already resolved a binding preserve it and answer new lookups with it.
+Candidate-only state is not silently promoted to VALUE on restart.
+
+\paragraph{Proof boundaries.}
+The intended claim is that a surviving RESOLVE decision or resolved binding
+preserves its value; if all such copies disappear, any surviving dependent effect
+must either provide sufficient recovery evidence or be safely invalidated. This
+is a lemma to prove, not a consequence of losing the coordinator alone.
+Likewise, replacement of an unrecoverable timestamp must preserve every
+IOCL-relevant surviving ordering obligation. A final ACK can externalize an
+ordering condition without carrying a timestamp or finalTS. Duplicate suppression
+alone does not establish that the reconstructed prefix preserves that condition.
+
+\paragraph{First invariant targets.}
+\begin{enumerate}
+\item All admissible historical VALUE reports for a binding agree.
+\item Every retained historical value is reported; rejected stale messages cannot
+introduce an unreported usable binding after a fence, including after restart.
+\item Every ongoing reconstruction capable of discovering a binding is represented
+by a HOLE; completed NOPE answers cannot silently become incompatible usable data.
+\item Holes resolve before incompatible replacements become usable. Accepted values
+remain unusable until resolution; late conflicting resolved values are unreachable.
+\item Resolution and evidence rediscovery remain safe under arbitrary repeated
+leader failovers within the underlying replication protocol's fault assumptions.
+\item Reconstructed timestamp floors, READY states, and POQ draining fit the retained
+ordered prefix and preserve the ordering obligations exposed by prior final ACKs.
+\item Replay, result caching, and duplicate suppression preserve logical operation
+identity and client dependency reference counts.
+\end{enumerate}
