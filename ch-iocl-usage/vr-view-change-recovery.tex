@@ -1,9 +1,3 @@
-% Requires: \usepackage{amsmath,amssymb,algorithm,algpseudocode}
-% Based on Viewstamped Replication Revisited, Sections 4.2--4.3.
-% Fixed configuration; complete logs; deterministic service operations.
-% Procedure names and bookkeeping containers below are expository additions.
-% Protocol messages retain the paper's names and field order.
-
 \begin{algorithm}[!tb]
   \caption{Viewstamped Replication: Starting a View Change}
   \label{vr-start-view-change}
@@ -17,15 +11,8 @@
     \State $\mathit{status}\gets\mathsf{normal}$
     \State $l\gets\langle\rangle;\quad n\gets 0;\quad k\gets 0$
       \Comment{Log; op-number; commit-number}
-    % \State $\mathit{clientTable}\gets\emptyset$
-    %   \Comment{Latest request number and any result per client}
     \State $\mathit{svc}\gets\emptyset;\quad\mathit{dvc}\gets\emptyset$
       \Comment{Senders; reports indexed by sender, for view $v$}
-    % \State $\mathit{sentDVC}\gets\mathsf{false}$
-    % \Statex \Comment{State is shared by all three algorithms; initialization is once.}
-    % \Statex \Comment{Sending to oneself invokes the corresponding handler locally.}
-    % \Statex \Comment{Normal processing requires status normal and a matching view.}
-    % \Statex \Comment{Retransmit unanswered messages; count distinct senders only.}
 
     \Procedure{LeaderTimeout}{}
       \If{$\mathit{status}\ne\mathsf{recovering}$}
@@ -39,12 +26,9 @@
       \EndIf
       \State $v\gets w;\quad\mathit{status}\gets\mathsf{view\mbox{-}change}$
       \State $\mathit{svc}\gets\emptyset;\quad\mathit{dvc}\gets\emptyset$
-      % \State $\mathit{sentDVC}\gets\mathsf{false}$
         \Comment{Keep $v',l,n,k$ unchanged}
-      % \State \textbf{send} $\ArrivalTSResponse(args)$
       \State \textbf{send} $\textsc{StartViewChange}(v,i)$
         to all other replicas
-      % \State Restart the view-change timer
     \EndProcedure
 
     \Procedure{StartViewChangeRecv}{$w,j$}
@@ -70,14 +54,6 @@
   \caption{Viewstamped Replication: Installing a New View}
   \label{vr-install-view}
   \begin{algorithmic}[1]
-    % \Statex \Comment{Uses replica state from Algorithm~\ref{vr-start-view-change}.}
-    % \Statex \Comment{Each report $d$ has fields $(v,l,v',n,k,i)$.}
-    % \Statex \Comment{Log positions are $1,\ldots,n$; $k$ ends the committed prefix.}
-    % \Statex \Comment{Client-table refresh removes discarded pending requests and}
-    % \Statex \Comment{records retained requests, preserving already executed results.}
-    % \Statex \Comment{Execution below is in log order, skips already executed entries,}
-    % \Statex \Comment{and records results in the client-table. Only the primary replies.}
-
     \Procedure{DoViewChangeRecv}{$w,l_j,v'_j,n_j,k_j,j$}
       \If{$\mathit{status}=\mathsf{recovering}\lor w<v$}
         \State \textbf{return}
@@ -93,23 +69,14 @@
           \State \Comment{Select highest pre-view-change view; break ties with log length}
           \State $l\gets r^*.l;\quad n\gets |l|$
           \State $k\gets\max\{r.k:r\in\operatorname{range}(\mathit{dvc})\}$
-          % \State Refresh $\mathit{clientTable}$ from the installed log
           \State $\mathit{status}\gets\mathsf{normal};\quad v'\gets v$
           \State \textbf{send} $\textsc{StartView}(v,l,n,k)$
             to all other replicas
-          % \State Execute entries through $k$ not previously executed;
-          % \Statex \hspace{\algorithmicindent}\hspace{\algorithmicindent}
-          %   send $\langle\mathrm{REPLY},v,s,x\rangle$ to each corresponding client
-          % \State Resume normal primary processing
-          %   \Comment{New requests follow the installed log}
-          % \Statex \Comment{Entries after $k$ commit via normal PREPAREOK processing:}
-          % \Statex \Comment{$f$ backup acknowledgments plus the primary's own copy.}
         \EndIf
       \EndIf
     \EndProcedure
 
     \Procedure{StartViewRecv}{$w,l_p,n_p,k_p$}
-      % \Statex \Comment{Received from $\mathsf{primary}(w)$.}
       \If{$\mathit{status}=\mathsf{recovering}\lor w<v$}
         \State \textbf{return}
       \EndIf
@@ -117,14 +84,11 @@
         \State \textbf{return}
       \EndIf
       \State $v\gets w;\quad l\gets l_p;\quad n\gets n_p;\quad k\gets k_p$
-      % \State Refresh $\mathit{clientTable}$ from the installed log
       \State $\mathit{status}\gets\mathsf{normal};\quad v'\gets v$
       \If{$n>k$}
         \State \textbf{send} $\textsc{PrepareOk}(v,n,i)$
           to $\mathsf{primary}(v)$
       \EndIf
-      % \State Execute entries through $k$ not previously executed
-      % \State Restart the primary-monitoring timer
     \EndProcedure
   \end{algorithmic}
 \end{algorithm}
@@ -133,18 +97,12 @@
   \caption{Viewstamped Replication: Recovery After a Crash}
   \label{vr-recovery}
   \begin{algorithmic}[1]
-    % \Statex \Comment{Uses the configuration and replica identity defined above.}
     \State $x\gets\bot$
       \Comment{Nonce unique across this replica's recovery attempts}
     \State $\mathit{responses}\gets\emptyset$
       \Comment{Latest recovery response per sender}
-    % \Statex \Comment{While recovering, do not process normal or view-change messages.}
-    % \Statex \Comment{Full-log reconstruction below assumes an initially empty service;}
-    % \Statex \Comment{with checkpoints, replay only entries after the checkpoint.}
-
     \Procedure{Recover}{}
       \State $\mathit{status}\gets\mathsf{recovering}$
-      % \State Obtain $\mathit{configuration}$ and this replica's number $i$
       \State $x\gets\mathsf{freshNonce}();\quad\mathit{responses}\gets\emptyset$
       \State \textbf{send} $\textsc{Recovery}(i, x)$ to all other replicas \Comment{On timeout, retransmit}
     \EndProcedure
@@ -183,15 +141,8 @@
           \Comment{Need the primary's state for the highest reported view}
       \EndIf
       \State $v\gets w^*;\quad l\gets r.l;\quad n\gets r.n;\quad k\gets r.k$
-      % \State Reconstruct service state and $\mathit{clientTable}$ from $l$:
-      % \Statex \hspace{\algorithmicindent}\hspace{\algorithmicindent}
-      %   execute the prefix $1,\ldots,k$ without sending client replies;
-      % \Statex \hspace{\algorithmicindent}\hspace{\algorithmicindent}
-      %   record entries $k+1,\ldots,n$ as pending requests
       \State $\mathit{svc}\gets\emptyset;\quad\mathit{dvc}\gets\emptyset$
-      % \State $\mathit{sentDVC}\gets\mathsf{false}$
       \State $v'\gets v;\quad\mathit{status}\gets\mathsf{normal}$
-      % \State Restart the primary-monitoring timer
     \EndProcedure
   \end{algorithmic}
 \end{algorithm}
