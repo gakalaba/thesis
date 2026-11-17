@@ -13,12 +13,20 @@
       \Comment{Log; op-number; commit-number}
     \State $\mathit{svc}\gets\emptyset;\quad\mathit{dvc}\gets\emptyset$
       \Comment{Senders; reports indexed by sender, for view $v$}
+    \State $\mathit{viewWaiters}\gets\emptyset$
+      \Comment{Promises for callers of \textsc{ViewChange}}
 
-    \Procedure{LeaderTimeout}{}
-      \If{$\mathit{status}\ne\mathsf{recovering}$}
-        \State \Call{EnterViewChange}{$v+1$}
-      \EndIf
-    \EndProcedure
+    \Procedure{ViewChange}{}
+    \If{$\mathit{status}=\mathsf{recovering}$}
+      \State \textbf{return} $\bot$
+    \EndIf
+    \State $w\gets v+1$
+    \State $p\gets\mathsf{newPromise}()$
+    \State $\mathit{viewWaiters}\gets
+      \mathit{viewWaiters}\cup\{(w,p)\}$
+    \State \Call{EnterViewChange}{$w$}
+    \State \textbf{return} \textbf{await} $p.\mathsf{future}()$
+  \EndProcedure
 
     \Procedure{EnterViewChange}{$w$}
       \If{$\mathit{status}=\mathsf{recovering}\lor w\le v$}
@@ -70,6 +78,7 @@
           \State $l\gets r^*.l;\quad n\gets |l|$
           \State $k\gets\max\{r.k:r\in\operatorname{range}(\mathit{dvc})\}$
           \State $\mathit{status}\gets\mathsf{normal};\quad v'\gets v$
+          \State \Call{CompleteViewChange}{$l$}
           \State \textbf{send} $\textsc{StartView}(v,l,n,k)$
             to all other replicas
         \EndIf
@@ -85,11 +94,22 @@
       \EndIf
       \State $v\gets w;\quad l\gets l_p;\quad n\gets n_p;\quad k\gets k_p$
       \State $\mathit{status}\gets\mathsf{normal};\quad v'\gets v$
+      \State \Call{CompleteViewChange}{$l$}
       \If{$n>k$}
         \State \textbf{send} $\textsc{PrepareOk}(v,n,i)$
           to $\mathsf{primary}(v)$
       \EndIf
     \EndProcedure
+
+    \Procedure{CompleteViewChange}{$l$}
+    \For{each $(w,p)\in\mathit{viewWaiters}$}
+      \If{$w\le v$}
+        \State $p.\mathsf{resolve}(\mathsf{copy}(l))$
+        \State $\mathit{viewWaiters}\gets
+          \mathit{viewWaiters}\setminus\{(w,p)\}$
+      \EndIf
+    \EndFor
+  \EndProcedure
   \end{algorithmic}
 \end{algorithm}
 
