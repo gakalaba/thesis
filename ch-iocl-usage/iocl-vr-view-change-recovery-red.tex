@@ -1,0 +1,207 @@
+% Add to the thesis preamble:
+% \usepackage{xcolor}
+\newcommand{\vradded}[1]{\textcolor{blue}{#1}}
+% Existing requirements: amsmath, amssymb, algorithm, algpseudocode.
+%
+% Red marks additions or replacements relative to the user's pasted version.
+% The original ordered-log names l,n,k are retained: C is an alias for l.
+% u is the first-round VR insertion log; U is its materialized unordered map.
+% Bag(u) maps each request handle to its immutable request details; repeated
+% insertions of the same handle are idempotent and have identical details.
+% Full logs are assumed; bag garbage collection is outside this algorithm.
+% Each stream follows ordinary VR prefix replication in a shared view.
+% Both streams must be installed before that replica becomes VR-normal.
+% PrepareOkU acknowledges the insertion stream; PrepareOk acknowledges C.
+% Normal first-round acknowledgments/callbacks use n_U and k_U.
+% A single v' suffices because every normal view installs both streams.
+% These algorithms restore replication state. IOCL's timestamp, coordination,
+% and execution-state reconstruction remains a separate step; VR-normal here
+% does not bypass that step or IOCL's normal execution conditions.
+
+\begin{algorithm}[!tb]
+  \caption{Viewstamped Replication: Starting a View Change}
+  \label{vr-start-view-change}
+  \begin{algorithmic}[1]
+    \State $\mathit{configuration}\gets\langle r_1,\ldots,r_{2f+1}\rangle$
+      \Comment{Replicas sorted by IP address}
+    \State $i\gets$ this replica's number in $\mathit{configuration}$
+    \State $\mathsf{primary}(v)\gets 1+(v\bmod(2f+1))$
+    \State $v\gets 0;\quad v'\gets 0$
+      \Comment{Current view; latest normal view}
+    \State $\mathit{status}\gets\mathsf{normal}$
+    \State $l\gets\langle\rangle;\quad n\gets 0;\quad k\gets 0$
+      \Comment{Log; op-number; commit-number}
+    % \Statex \vradded{\Comment{$C\equiv l$: the IOCL ordered log; same structure, two names}}
+    \State \vradded{$u\gets\langle\rangle;\quad n_U\gets 0;\quad k_U\gets 0$}
+      \Comment{Unordered bag's insertion log}
+    \State \vradded{$U:\mathsf{Handle}\rightharpoonup\mathsf{Request};\quad U\gets\emptyset$}
+      \Comment{Unordered bag materialized by $\mathsf{Bag}(u)$}
+    % \Statex \vradded{\Comment{Each stream has VR prefix replication; both share $v,v'$ and primary}}
+    \State $\mathit{svc}\gets\emptyset;\quad\mathit{dvc}\gets\emptyset$
+      \Comment{Senders; reports indexed by sender, for view $v$}
+    \State $\mathit{viewWaiters}\gets\emptyset$
+      \Comment{Promises for callers of \textsc{ViewChange}}
+
+    \Procedure{ViewChange}{}
+      \If{$\mathit{status}=\mathsf{recovering}$}
+        \State \textbf{return} $\bot$
+      \EndIf
+      \State $w\gets v+1$
+      \State $p\gets\mathsf{newPromise}()$
+      \State $\mathit{viewWaiters}\gets\mathit{viewWaiters}\cup\{(w,p)\}$
+      \State \Call{EnterViewChange}{$w$}
+      \State \textbf{return} \textbf{await} $p.\mathsf{future}()$
+    \EndProcedure
+
+    \Procedure{EnterViewChange}{$w$}
+      \If{$\mathit{status}=\mathsf{recovering}\lor w\le v$}
+        \State \textbf{return}
+      \EndIf
+      \State $v\gets w;\quad\mathit{status}\gets\mathsf{view\mbox{-}change}$
+      \State $\mathit{svc}\gets\emptyset;\quad\mathit{dvc}\gets\emptyset$
+        \Comment{Keep $v',l,n,k\vradded{,u,n_U,k_U,U}$ unchanged}
+      \State \textbf{send} $\textsc{StartViewChange}(v,i)$ to all other replicas
+    \EndProcedure
+
+    \Procedure{StartViewChangeRecv}{$w,j$}
+      \If{$\mathit{status}=\mathsf{recovering}\lor w<v$}
+        \State \textbf{return}
+      \EndIf
+      \If{$w>v$}
+        \State \Call{EnterViewChange}{$w$}
+      \EndIf
+      \If{$\mathit{status}=\mathsf{view\mbox{-}change}$} \Comment{$w=v$ here}
+        \State $\mathit{svc}\gets\mathit{svc}\cup\{j\}$
+        \If{$|\mathit{svc}\setminus\{i\}|\ge f$}
+          \State \textbf{send}
+            $\textsc{DoViewChange}(v,l,v',n,k\vradded{,u,n_U,k_U},i)$
+            to $\mathsf{primary}(v)$
+        \EndIf
+      \EndIf
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[!tb]
+  \caption{Viewstamped Replication: Installing a New View}
+  \label{vr-install-view}
+  \begin{algorithmic}[1]
+    \Procedure{DoViewChangeRecv}{$w,l_j,v'_j,n_j,k_j\vradded{,u_j,n_{U,j},k_{U,j}},j$}
+      \If{$\mathit{status}=\mathsf{recovering}\lor w<v$}
+        \State \textbf{return}
+      \EndIf
+      \If{$w>v$}
+        \State \Call{EnterViewChange}{$w$}
+      \EndIf
+      \If{$\mathit{status}=\mathsf{view\mbox{-}change}\land i=\mathsf{primary}(v)$}
+        \Comment{$w=v$ here}
+        \State $\mathit{dvc}[j]\gets(w,l_j,v'_j,n_j,k_j\vradded{,u_j,n_{U_j},k_{U_j}},j)$
+          \Comment{Store each response}
+        \If{$|\mathit{dvc}|\ge f+1\land i\in\operatorname{dom}(\mathit{dvc})$}
+          \State $r^*\gets\arg\max_{r\in\operatorname{range}(\mathit{dvc})}(r.v',r.n)$
+          \State \Comment{Select highest pre-view-change view; break ties with log length}
+          \State $l\gets r^*.l;\quad n\gets |l|$
+          \State $k\gets\max\{r.k:r\in\operatorname{range}(\mathit{dvc})\}$
+          \State \vradded{$r_U^*\gets\arg\max_{r\in\operatorname{range}(\mathit{dvc})}(r.v',r.n_U)$} \Comment{Select insertion log independently}
+          \State \vradded{$u\gets r_U^*.u;\quad n_U\gets |u|$}
+          \State \vradded{$k_U\gets\max\{r.k_U:r\in\operatorname{range}(\mathit{dvc})\}$}
+          \State \vradded{$U\gets\mathsf{Bag}(u)$} \Comment{Materialize the map from all insertions in $u$}
+          \State $\mathit{status}\gets\mathsf{normal};\quad v'\gets v$
+          \State \Call{CompleteViewChange}{$\vradded{U},l$}
+          \State \textbf{send} $\textsc{StartView}(v,l,n,k\vradded{,u,n_U,k_U})$
+            to all other replicas
+        \EndIf
+
+      \EndIf
+    \EndProcedure
+
+    \Procedure{StartViewRecv}{$w,l_p,n_p,k_p\vradded{,u_p,n_{U_p},k_{U_p}}$}
+      \If{$\mathit{status}=\mathsf{recovering}\lor w<v$}
+        \State \textbf{return}
+      \EndIf
+      \If{$w=v\land\mathit{status}=\mathsf{normal}$} \Comment{Duplicate}
+        \State \textbf{return}
+      \EndIf
+      \State $v\gets w;\quad l\gets l_p;\quad n\gets n_p;\quad k\gets k_p$
+      \State \vradded{$u\gets u_p;\quad n_U\gets n_{U_p};\quad k_U\gets k_{U_p}$}
+      \State \vradded{$U\gets\mathsf{Bag}(u)$} \Comment{Materialize the map from all insertions in $u$}
+      \State $\mathit{status}\gets\mathsf{normal};\quad v'\gets v$
+      \State \Call{CompleteViewChange}{$\vradded{U},l$}
+      \If{$n>k$}
+        \State \textbf{send} $\textsc{PrepareOk}(v,n,i)$ to $\mathsf{primary}(v)$
+      \EndIf
+      \If{$n_U>k_U$}
+        \State \textbf{send} $\textsc{PrepareOkU}(v,n_U,i)$ to $\mathsf{primary}(v)$
+      \EndIf
+      % \Statex \vradded{\Comment{PrepareOkU is the insertion stream's normal VR acknowledgment}}
+    \EndProcedure
+
+    \Procedure{CompleteViewChange}{$\vradded{U},l$}
+      \For{each $(w,p)\in\mathit{viewWaiters}$}
+        \If{$w\le v$}
+          \State $p.\mathsf{resolve}(\vradded{U},l)$
+          \State $\mathit{viewWaiters}\gets\mathit{viewWaiters}\setminus\{(w,p)\}$
+        \EndIf
+      \EndFor
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[!tb]
+  \caption{Viewstamped Replication: Recovery After a Crash}
+  \label{vr-recovery}
+  \begin{algorithmic}[1]
+    \State $x\gets\bot$
+      \Comment{Nonce unique across this replica's recovery attempts}
+    \State $\mathit{responses}\gets\emptyset$
+      \Comment{Latest recovery response per sender}
+    \Procedure{Recover}{}
+      \State $\mathit{status}\gets\mathsf{recovering}$
+      \State $x\gets\mathsf{freshNonce}();\quad\mathit{responses}\gets\emptyset$
+      \State \textbf{send} $\textsc{Recovery}(i,x)$ to all other replicas
+        \Comment{On timeout, retransmit}
+    \EndProcedure
+
+    \Procedure{RecoveryRecv}{$j,x_j$}
+      \If{$\mathit{status}\ne\mathsf{normal}$}
+        \State \textbf{return}
+          \Comment{The requester retries}
+      \EndIf
+      \If{$i=\mathsf{primary}(v)$}
+        \State \textbf{send} $\textsc{RecoveryResponse}(v,x_j,l,n,k\vradded{,u,n_U,k_U},i)$ to $j$
+      \Else
+        \State \textbf{send} $\textsc{RecoveryResponse}(v,x_j,\mathsf{nil},\mathsf{nil},\mathsf{nil}
+          \vradded{,\mathsf{nil},\mathsf{nil},\mathsf{nil}},i)$ to $j$
+      \EndIf
+    \EndProcedure
+
+    \Procedure{RecoveryResponseRecv}{$w,x_j,l_j,n_j,k_j\vradded{,u_j,n_{U_j},k_{U_j}},j$}
+      \If{$\mathit{status}\ne\mathsf{recovering}\lor x_j\ne x$}
+        \State \textbf{return}
+      \EndIf
+      \If{$j\in\operatorname{dom}(\mathit{responses})\land w<\mathit{responses}[j].v$}
+        \State \textbf{return} \Comment{Keep highest reported view}
+      \EndIf
+      \State $\mathit{responses}[j]\gets(w,x_j,l_j,n_j,k_j\vradded{,u_j,n_{U_j},k_{U_j}},j)$
+      \If{$|\mathit{responses}|<f+1$}
+        \State \textbf{return}
+      \EndIf
+      \State $w^*\gets\max\{r.v:r\in\operatorname{range}(\mathit{responses})\}$
+        \Comment{Response with highest view}
+      \State $p\gets\mathsf{primary}(w^*)$
+      \If{$p\notin\operatorname{dom}(\mathit{responses})$}
+        \State \textbf{return}
+      \EndIf
+      \State $r\gets\mathit{responses}[p]$
+      \If{$r.v\ne w^*$}
+        \State \textbf{return}
+          \Comment{Need the primary's state for the highest reported view}
+      \EndIf
+      \State $v\gets w^*;\quad l\gets r.l;\quad n\gets r.n;\quad k\gets r.k$
+      \State \vradded{$u\gets r.u;\quad n_U\gets r.n_U;\quad k_U\gets r.k_U$}
+      \State \vradded{$U\gets\mathsf{Bag}(u)$}
+      \State $\mathit{svc}\gets\emptyset;\quad\mathit{dvc}\gets\emptyset$
+      \State $v'\gets v;\quad\mathit{status}\gets\mathsf{normal}$
+    \EndProcedure
+  \end{algorithmic}
+\end{algorithm}
